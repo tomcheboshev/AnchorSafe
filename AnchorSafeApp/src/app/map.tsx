@@ -18,7 +18,13 @@ const IS_WEB = Platform.OS === 'web';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
-const ZONES = [
+import { geoJsonToZones } from '../data/geoJsonToZones'
+
+import safe from '../data/safe.json';
+import data from '../data/data.json'
+const ZONES = geoJsonToZones(data);
+
+const USELESSZONES = [
   {
     id: 'z1',
     name: 'Blue Lagoon',
@@ -90,7 +96,7 @@ function LeafletMap({ selectedZoneId, onZonePress }: {
   }, [onZonePress]);
 
   const zonesJson = JSON.stringify(
-    ZONES.map(z => ({ id: z.id, coords: z.coords, color: z.color }))
+    ZONES.map((z: any) => ({ id: z.id, coords: z.coords, color: z.color }))
   );
 
   const html = `<!DOCTYPE html><html><head>
@@ -99,7 +105,7 @@ function LeafletMap({ selectedZoneId, onZonePress }: {
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <style>*{margin:0;padding:0}html,body,#map{width:100%;height:100%}</style>
   </head><body><div id="map"></div><script>
-  var map=L.map('map',{center:[35.887,14.350],zoom:14,zoomControl:false,attributionControl:false});
+  var map=L.map('map',{center:[45.549,13.7276],zoom:14,zoomControl:false,attributionControl:false});
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(map);
   var zones=${zonesJson};
   var selected='${selectedZoneId}';
@@ -111,7 +117,7 @@ function LeafletMap({ selectedZoneId, onZonePress }: {
   L.marker([35.889,14.343],{icon:ai}).addTo(map);
   L.marker([35.892,14.355],{icon:ai}).addTo(map);
   var ui=L.divIcon({html:'<div style="width:14px;height:14px;background:#1A6FA8;border-radius:50%;border:3px solid white;box-shadow:0 0 0 3px rgba(26,111,168,0.3);"></div>',iconSize:[14,14],iconAnchor:[7,7],className:''});
-  L.marker([35.883,14.341],{icon:ui}).addTo(map);
+  L.marker([45.549,13.7276],{icon:ui}).addTo(map);
   </script></body></html>`;
 
   if (!IS_WEB) return null;
@@ -160,7 +166,7 @@ export default function MapScreen({
   const cardAnim = React.useRef(new Animated.Value(0)).current;
   const sosAnim = React.useRef(new Animated.Value(1)).current;
 
-  const zone = ZONES.find(z => z.id === selectedId) ?? ZONES[0];
+  const zone = ZONES.find((z: any) => z.id === selectedId) ?? ZONES[0];
   const zc = zone.type === 'safe' ? C.safe : zone.type === 'danger' ? C.danger : C.caution;
 
   
@@ -314,7 +320,7 @@ export default function MapScreen({
           style={{ marginTop: 8 }}
           contentContainerStyle={{ paddingHorizontal: 14, gap: 8 }}
         >
-          {ZONES.map(z => {
+          {ZONES.map((z: any) => {
             const active = z.id === selectedId;
             const col = z.type === 'safe' ? C.safe : z.type === 'danger' ? C.danger : C.caution;
             return (
