@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
 import BottomNav from "../components/ui/BottomNav";
 import {
   View,
@@ -51,12 +52,6 @@ const ZONE = {
   prohibited: 'Commercial fishing, spearfishing, and high-speed transit (>5kt).',
 };
 
-const TABS = [
-  { key: 'map',     label: 'Map',     icon: '🗺' },
-  { key: 'zones',   label: 'Zones',   icon: '⬡' },
-  { key: 'alerts',  label: 'Alerts',  icon: '🔔' },
-  { key: 'profile', label: 'Profile', icon: '👤' },
-];
 
 // ─── Glass Card ───────────────────────────────────────────────────────────────
 
@@ -69,7 +64,11 @@ function GlassCard({ children, style }: { children: React.ReactNode; style?: obj
 function StatChip({ icon, label, value }: { icon: string; label: string; value: string }) {
   return (
     <GlassCard style={s.statChip}>
-      <Text style={s.statIcon}>{icon}</Text>
+      <Ionicons
+  name={icon as any}
+  size={20}
+  color={C.primary}
+/>
       <Text style={s.statLabel}>{label}</Text>
       <Text style={s.statValue}>{value}</Text>
     </GlassCard>
@@ -123,13 +122,7 @@ export default function ZoneDetailScreen({
 
       {/* HEADER */}
       <Animated.View style={[s.header, { opacity: fadeHeader }]}>
-        <TouchableOpacity style={s.headerBtn}>
-          <Text style={s.headerBtnIcon}>←</Text>
-        </TouchableOpacity>
         <Text style={s.headerTitle}>{ZONE.name}</Text>
-        <TouchableOpacity style={s.headerBtn}>
-          <Text style={s.headerBtnIcon}>🔍</Text>
-        </TouchableOpacity>
       </Animated.View>
 
       {/* SCROLL CONTENT */}
@@ -157,7 +150,6 @@ export default function ZoneDetailScreen({
         {/* STATUS BADGE */}
         <Animated.View style={[s.statusSection, { opacity: fadeBadge }]}>
           <View style={s.statusBadge}>
-            <Text style={s.statusAnchor}>⚓</Text>
             <Text style={s.statusLabel}>{ZONE.statusLabel}</Text>
           </View>
           <Text style={s.statusSub}>{ZONE.updatedAgo}</Text>
@@ -165,16 +157,16 @@ export default function ZoneDetailScreen({
 
         {/* STATS ROW */}
         <Animated.View style={[s.statsRow, { opacity: fadeStats }]}>
-          <StatChip icon="📏" label="Distance" value={ZONE.distance} />
-          <StatChip icon="🌊" label="Depth"    value={ZONE.depth}    />
-          <StatChip icon="🪨" label="Seabed"   value={ZONE.seabed}   />
+          <StatChip icon="boat-outline" label="Distance" value={ZONE.distance} />
+          <StatChip icon="water-outline" label="Depth"    value={ZONE.depth}    />
+          <StatChip icon="location-outline" label="Seabed"   value={ZONE.seabed}   />
         </Animated.View>
 
         {/* ENVIRONMENTAL IMPACT */}
         <Animated.View style={{ opacity: fadeEnv }}>
           <GlassCard style={s.section}>
             <View style={s.sectionHeader}>
-              <Text style={s.sectionIcon}>🌿</Text>
+              <Text style={s.sectionIcon}></Text>
               <Text style={s.sectionTitle}>Environmental Impact</Text>
             </View>
 
@@ -199,7 +191,7 @@ export default function ZoneDetailScreen({
         <Animated.View style={{ opacity: fadeRegs }}>
           <GlassCard style={s.section}>
             <View style={s.sectionHeader}>
-              <Text style={s.sectionIcon}>⚖️</Text>
+              <Text style={s.sectionIcon}></Text>
               <Text style={s.sectionTitle}>Regulations</Text>
             </View>
 
@@ -277,8 +269,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 52 : 36,
-    paddingBottom: 14,
+    paddingVertical: 13,
     paddingHorizontal: 16,
     backgroundColor: 'rgba(249,249,255,0.82)',
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -300,7 +291,6 @@ const s = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     color: C.primary,
-    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
     letterSpacing: -0.4,
   },
 
@@ -375,10 +365,9 @@ const s = StyleSheet.create({
     color: C.safe,
   },
   statusLabel: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
     color: C.safe,
-    fontFamily: Platform.OS === 'ios' ? 'Helvetica Neue' : 'sans-serif-medium',
   },
   statusSub: {
     fontSize: 13,
@@ -440,7 +429,7 @@ const s = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: '500',
     color: C.text,
     fontFamily: Platform.OS === 'ios' ? 'Helvetica Neue' : 'sans-serif-medium',
   },

@@ -1,5 +1,8 @@
 import React from "react";
 import {
+  Ionicons,
+} from "@expo/vector-icons";
+import {
   View,
   Text,
   TouchableOpacity,
@@ -14,11 +17,31 @@ const C = {
 };
 
 const TABS = [
-  { key: "map", label: "Map", icon: "🗺" },
-  { key: "zones", label: "Zones", icon: "⬡" },
-  { key: "alerts", label: "Alerts", icon: "🔔" },
-  { key: "profile", label: "Profile", icon: "👤" },
-];
+  {
+    key: "map",
+    label: "Map",
+    icon: "map-outline",
+    activeIcon: "map",
+  },
+  {
+    key: "zones",
+    label: "Zones",
+    icon: "layers-outline",
+    activeIcon: "layers",
+  },
+  {
+    key: "alerts",
+    label: "Alerts",
+    icon: "notifications-outline",
+    activeIcon: "notifications",
+  },
+  {
+    key: "profile",
+    label: "Profile",
+    icon: "person-outline",
+    activeIcon: "person",
+  },
+] as const;
 
 export default function BottomNav({
   activeTab,
@@ -41,16 +64,19 @@ export default function BottomNav({
               <View style={s.tabDot} />
             )}
 
-            <Text
-              style={[
-                s.tabIcon,
-                {
-                  opacity: active ? 1 : 0.35,
-                },
-              ]}
-            >
-              {tab.icon}
-            </Text>
+            <Ionicons
+            name={
+                active
+                ? tab.activeIcon
+                : tab.icon
+            }
+            size={22}
+            color={
+                active
+                ? C.primary
+                : C.secondary
+            }
+            />
 
             <Text
               style={[

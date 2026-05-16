@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
 import BottomNav from "../components/ui/BottomNav";
 import {
   View,
@@ -33,7 +34,7 @@ const C = {
 const CRITICAL = [
   {
     id: 'c1',
-    icon: '⚠',
+    icon: 'warning-outline',
     title: 'Restricted Marine Area',
     sub: 'Habitat Protection • 1.2 nm',
     time: '2 mins ago',
@@ -42,7 +43,7 @@ const CRITICAL = [
   },
   {
     id: 'c2',
-    icon: '🛡',
+    icon: 'shield-checkmark-outline',
     title: 'Submerged Obstruction',
     sub: 'Danger Zone • 0.5 nm',
     time: '15 mins ago',
@@ -54,7 +55,7 @@ const CRITICAL = [
 const WEATHER = [
   {
     id: 'w1',
-    icon: '💨',
+    icon: 'cloudy-night-outline',
     title: 'High Wind Advisory',
     sub: 'Cannes Coastal Sector',
     time: '1 hour ago',
@@ -66,7 +67,7 @@ const WEATHER = [
 const NOTICES = [
   {
     id: 'n1',
-    icon: '⚓',
+    icon: 'boat-outline',
     title: 'Port de Cannes',
     sub: 'Mooring Availability',
     time: '3 hours ago',
@@ -76,7 +77,7 @@ const NOTICES = [
   },
   {
     id: 'n2',
-    icon: '🔄',
+    icon: 'sync-outline',
     title: 'System Update',
     sub: 'Map Version 4.2.0',
     time: '5 hours ago',
@@ -84,13 +85,6 @@ const NOTICES = [
     cta: null,
     ctaPrimary: false,
   },
-];
-
-const TABS = [
-  { key: 'map',     label: 'Map',     icon: '🗺' },
-  { key: 'zones',   label: 'Zones',   icon: '⬡' },
-  { key: 'alerts',  label: 'Alerts',  icon: '🔔' },
-  { key: 'profile', label: 'Profile', icon: '👤' },
 ];
 
 // ─── Alert Card ───────────────────────────────────────────────────────────────
@@ -141,7 +135,11 @@ function AlertCard({
         <View style={s.cardTop}>
           <View style={s.cardLeft}>
             <View style={[s.iconCircle, { backgroundColor: accentColor + '18' }]}>
-              <Text style={[s.iconEmoji, { color: accentColor }]}>{icon}</Text>
+              <Ionicons
+                name={icon as any}
+                size={20}
+                color={accentColor}
+                />
             </View>
             <View style={s.cardTitles}>
               <Text style={s.cardTitle}>{title}</Text>
@@ -193,7 +191,11 @@ function SectionHeader({
   return (
     <View style={s.sectionHeader}>
       <View style={s.sectionLeft}>
-        <Text style={[s.sectionIcon, { color }]}>{icon}</Text>
+        <Ionicons
+            name={icon as any}
+            size={24}
+            color={color}
+            />
         <Text style={[s.sectionTitle, { color: color === C.danger ? C.danger : C.text }]}>
           {title}
         </Text>
@@ -231,16 +233,7 @@ export default function AlertsScreen({
       {/* HEADER */}
       <View style={s.header}>
         <View style={s.headerLeft}>
-          <Text style={s.headerAnchor}>⚓</Text>
           <Text style={s.headerTitle}>Alerts</Text>
-        </View>
-        <View style={s.headerRight}>
-          <TouchableOpacity style={s.headerBtn}>
-            <Text style={s.headerBtnIcon}>🔍</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.headerBtn}>
-            <Text style={s.headerBtnIcon}>⊞</Text>
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -252,7 +245,7 @@ export default function AlertsScreen({
       >
         {/* ── Critical ── */}
         <View style={s.section}>
-          <SectionHeader icon="🔴" title="Critical Alerts" color={C.danger} badge="2 Active" />
+          <SectionHeader icon="alert-circle-outline" title="Critical Alerts" color={C.danger} badge="2 Active" />
           {CRITICAL.map((item, i) => (
             <AlertCard
               key={item.id}
@@ -270,7 +263,7 @@ export default function AlertsScreen({
 
         {/* ── Weather ── */}
         <View style={s.section}>
-          <SectionHeader icon="⚡" title="Weather Warnings" color={C.warning} />
+          <SectionHeader icon="thunderstorm-outline" title="Weather Warnings" color={C.warning} />
           {WEATHER.map((item, i) => (
             <AlertCard
               key={item.id}
@@ -288,7 +281,7 @@ export default function AlertsScreen({
 
         {/* ── Notices ── */}
         <View style={s.section}>
-          <SectionHeader icon="ℹ" title="General Notices" color={C.primary} />
+          <SectionHeader icon="information-circle-outline" title="General Notices" color={C.primary} />
           {NOTICES.map((item, i) => (
             <AlertCard
               key={item.id}
@@ -312,7 +305,11 @@ export default function AlertsScreen({
           <View style={s.sosBadge}>
             <Text style={s.sosBadgeTxt}>SOS</Text>
           </View>
-          <Text style={{ fontSize: 24, color: C.white }}>⚓</Text>
+          <Ionicons
+            name="warning"
+            size={24}
+            color={C.white}
+            />
         </TouchableOpacity>
       </Animated.View>
 
@@ -345,10 +342,10 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop:  Platform.OS === 'ios' ? 52 : 36,
-    paddingBottom: 14,
+    paddingVertical: 13,
     paddingHorizontal: 16,
-    backgroundColor: 'rgba(249,249,255,0.88)',
+    backgroundColor: 'rgba(255,255,255,0.75)',
+    backdropFilter: 'blur(12px)',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: C.outlineVar,
   },
@@ -362,11 +359,9 @@ const s = StyleSheet.create({
     color: C.primary,
   },
   headerTitle: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '700',
     color: C.primary,
-    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
-    letterSpacing: -0.4,
   },
   headerRight: {
     flexDirection: 'row',

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Ionicons } from "@expo/vector-icons";
 import BottomNav from "../components/ui/BottomNav";
 import {
   View,
@@ -64,6 +65,7 @@ const ZONES = [
 
 const C = {
   primary: '#1A6FA8',
+  white: '#FFF',
   safe: '#34C759',
   danger: '#FF3B30',
   caution: '#FFCC00',
@@ -181,12 +183,6 @@ export default function MapScreen({
 
   const cardH = cardAnim.interpolate({ inputRange: [0, 1], outputRange: [96, 228] });
 
-  const TABS = [
-    { key: 'map', label: 'Map', icon: '🗺' },
-    { key: 'zones', label: 'Zones', icon: '⬡' },
-    { key: 'alerts', label: 'Alerts', icon: '🔔' },
-    { key: 'profile', label: 'Profile', icon: '👤' },
-  ];
 
   return (
     <View style={s.root}>
@@ -200,16 +196,21 @@ export default function MapScreen({
       <View style={s.header}>
         <View style={s.headerRow}>
           <View style={s.headerLeft}>
-            <Text style={s.headerAnchor}>⚓</Text>
+            <Ionicons
+  name="boat-outline"
+  size={32}
+  color={C.primary}
+/>
             <Text style={s.headerTitle}>AnchorSafe</Text>
           </View>
-          <TouchableOpacity style={s.headerBtn}>
-            <Text style={{ fontSize: 17 }}>🔍</Text>
-          </TouchableOpacity>
         </View>
         <View style={s.searchWrap}>
           <View style={[s.searchBar, focused && s.searchFocused]}>
-            <Text style={{ fontSize: 14, color: C.sub }}>🔍</Text>
+            <Ionicons
+  name="search"
+  size={18}
+  color={C.sub}
+/>
             <TextInput
               style={s.searchInput}
               placeholder="Search zones, ports, or marinas"
@@ -243,7 +244,11 @@ export default function MapScreen({
           <View style={s.sosBadge}>
             <Text style={s.sosBadgeTxt}>SOS</Text>
           </View>
-          <Text style={{ fontSize: 24, color: '#fff' }}>⚓</Text>
+          <Ionicons
+            name="warning"
+            size={24}
+            color={C.white}
+          />
         </TouchableOpacity>
       </Animated.View>
 
@@ -345,14 +350,13 @@ const s = StyleSheet.create({
   header: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
   headerRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 50, paddingBottom: 10,
+    paddingHorizontal: 20, paddingVertical: 10,
     backgroundColor: 'rgba(236,241,247,0.96)',
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerAnchor: { fontSize: 20, color: C.primary },
   headerTitle: {
     fontSize: 22, fontWeight: '700', color: C.primary,
-    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
   },
   headerBtn: {
     width: 36, height: 36, borderRadius: 18,
