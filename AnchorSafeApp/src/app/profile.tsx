@@ -284,6 +284,7 @@
     },
     iconBtn: {
         padding: 6,
+        
     },
     topIcon: {
         fontSize: 20,
