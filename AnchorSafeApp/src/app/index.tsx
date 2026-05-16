@@ -4,6 +4,8 @@ import MapScreen from "./map";
 import ZonesScreen from "./zones";
 import AlertsScreen from "./alerts";
 import ProfileScreen from "./profile";
+import SupportScreen from "./support";
+import EmergencyContactsScreen from "./emergencyContacts";
 
 export default function Home() {
   const [activeScreen, setActiveScreen] =
@@ -28,6 +30,22 @@ export default function Home() {
   if (activeScreen === "profile") {
   return (
     <ProfileScreen
+      setActiveScreen={setActiveScreen}
+    />
+  );
+}
+
+if (activeScreen === "support") {
+  return (
+    <SupportScreen
+      setActiveScreen={setActiveScreen}
+    />
+  );
+}
+
+if (activeScreen === "emergencyContacts") {
+  return (
+    <EmergencyContactsScreen
       setActiveScreen={setActiveScreen}
     />
   );

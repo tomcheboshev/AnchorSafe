@@ -15,8 +15,7 @@
     Linking,
     } from 'react-native';
 
-    // ─── Colour tokens (matching original design) ────────────────────────────────
-    const C = {
+const C = {
     primary:             '#005ab3',
     secondary:           '#476083',
     background:          '#F4F9FC',
@@ -144,6 +143,43 @@
     const [envNotices,   setEnvNotices]   = useState(false);
 
 
+    const [contacts, setContacts] = useState([
+    {
+        id: 1,
+        name: "Name Surname",
+        phone: "+381123456789",
+        avatar:
+        "https://lh3.googleusercontent.com/aida-public/AB6AXuAwJ-c0GknTB0YWIltKhbh6_4XurelAigH7fEbMYsleyX01xo2h3jyoGjZtWpQ1DjZCXtQJqvEnaAVNvZoQJ9cdLLWnHaYIFkUa5jmggTbuuPkLC_cPgLtpj3mscXWhPQgyF2_OS1q6MX_8YDqTCcEh1SsAbyIT-FDUQp-NSq7fO0TPHFhpSbSG9z0mvohvL9bF5lSam4Zu_sBouLqIAI1DgGrVFQph5UE-Q-AQTsvP88AtZIAETVtiIn8Uxal-zafR8ZMWs781RfE",
+    },
+    {
+        id: 2,
+        name: "Name Surname",
+        phone: "+381987654321",
+        avatar:
+        "https://lh3.googleusercontent.com/aida-public/AB6AXuAwJ-c0GknTB0YWIltKhbh6_4XurelAigH7fEbMYsleyX01xo2h3jyoGjZtWpQ1DjZCXtQJqvEnaAVNvZoQJ9cdLLWnHaYIFkUa5jmggTbuuPkLC_cPgLtpj3mscXWhPQgyF2_OS1q6MX_8YDqTCcEh1SsAbyIT-FDUQp-NSq7fO0TPHFhpSbSG9z0mvohvL9bF5lSam4Zu_sBouLqIAI1DgGrVFQph5UE-Q-AQTsvP88AtZIAETVtiIn8Uxal-zafR8ZMWs781RfE",
+    },
+    ]);
+
+    const callContact = (phone: string) => {
+  const cleanNumber = phone.replace(/\s+/g, "");
+  Linking.openURL(`tel:${cleanNumber}`);
+};
+
+const removeContact = (id: number) => {
+  setContacts((prev) => prev.filter((c) => c.id !== id));
+};
+
+const addNewContact = () => {
+  const newContact = {
+    id: Date.now(),
+    name: "New Contact",
+    phone: "+381111222333",
+    avatar:
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuAwJ-c0GknTB0YWIltKhbh6_4XurelAigH7fEbMYsleyX01xo2h3jyoGjZtWpQ1DjZCXtQJqvEnaAVNvZoQJ9cdLLWnHaYIFkUa5jmggTbuuPkLC_cPgLtpj3mscXWhPQgyF2_OS1q6MX_8YDqTCcEh1SsAbyIT-FDUQp-NSq7fO0TPHFhpSbSG9z0mvohvL9bF5lSam4Zu_sBouLqIAI1DgGrVFQph5UE-Q-AQTsvP88AtZIAETVtiIn8Uxal-zafR8ZMWs781RfE",
+  };
+
+  setContacts((prev) => [...prev, newContact]);
+};
     return (
         <SafeAreaView style={styles.safe}>
         <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
@@ -151,7 +187,7 @@
         {/* ── Top App Bar ── */}
         <View style={styles.topBar}>
             <View style={styles.topBarLeft}>
-            <Text style={styles.screenTitle}>Profile Settings</Text>
+            <Text style={styles.screenTitle}>Support</Text>
             </View>
             <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7}>
             <Ionicons
@@ -180,72 +216,42 @@
             </View>
             </View>
 
-            {/* ── Navigation Preferences ── */}
-            <SectionHeader title="Navigation Preferences" />
-            <Card>
-            <ToggleRow
-                label="Show Depth Contours"
-                value={showDepth}
-                onChange={setShowDepth}
-            />
-            <ToggleRow
-                label="Automatic Rerouting"
-                value={autoReroute}
-                onChange={setAutoReroute}
-            />
-            <ArrowRow
-                label="Units of Measure"
-                value="Nautical Miles"
-                isLast
-            />
-            </Card>
-
-            {/* ── Notifications ── */}
-            <SectionHeader title="Notifications" />
-            <Card>
-            <ToggleRow
-                label="Proximity Alerts"
-                value={proximity}
-                onChange={setProximity}
-            />
-            <ToggleRow
-                label="Weather Warnings"
-                value={weather}
-                onChange={setWeather}
-            />
-            <ToggleRow
-                label="Environmental Notices"
-                value={envNotices}
-                onChange={setEnvNotices}
-                isLast
-            />
-            </Card>
-
-            {/* ── Safety ── */}
-            <SectionHeader title="Safety" />
-            <Card>
-            <ArrowRow
-                label="Manage Emergency Contacts"
-                 onPress={() => setActiveScreen("emergencyContacts")}
-            />
-            <ArrowRow
-                label="Vessel Finder"
-                externalLink
-                    onPress={() => Linking.openURL("https://www.vesselfinder.com/")}
-            />
-            </Card>
-
             {/* ── About & Support ── */}
-            <SectionHeader title="About & Support" />
-            <Card>
-            <ArrowRow label="Privacy Policy"  externalLink 
-            onPress={()=>Linking.openURL("https://www.anchorsafe.com/privacy-policy")} />
-            <ArrowRow label="Terms of Service" externalLink
-            onPress={()=>Linking.openURL("https://www.anchorsafe.com/terms-of-service")} />
-            <ArrowRow label="Support"
-            onPress={() => setActiveScreen("support")}/>
-            </Card>
+            <SectionHeader title="Emergency Contacts" />
+            
+            {contacts.map((contact) => (
+  <TouchableOpacity
+    key={contact.id}
+    style={styles.profileCard}
+    activeOpacity={0.7}
+    onPress={() => callContact(contact.phone)}
+  >
+    <Image source={{ uri: contact.avatar }} style={styles.avatar} />
 
+    <View style={{ flex: 1 }}>
+      <Text style={styles.profileName}>{contact.name}</Text>
+      <Text style={styles.profileSub}>{contact.phone}</Text>
+    </View>
+
+    {/* Remove Button */}
+    <TouchableOpacity
+      onPress={() => removeContact(contact.id)}
+      style={styles.removeBtn}
+    >
+      <Ionicons name="trash" size={20} color="white" />
+    </TouchableOpacity>
+  </TouchableOpacity>
+))}
+            <Card><ArrowRow
+                    label="Add Emergency Contact"
+                    externalLink
+                    onPress={addNewContact}
+                    />
+            </Card>
+            <Card>
+                <ArrowRow label="Go Back to Profile"
+                onPress={() => setActiveScreen("profile")}/>
+            </Card>
             {/* Version info */}
             <View style={styles.versionBlock}>
             <Text style={styles.versionApp}>AnchorSafe App</Text>
@@ -256,7 +262,7 @@
         {/* ── Bottom Navigation Bar ── */}
 
             <BottomNav
-            activeTab="profile"
+            activeTab="emergencyContacts"
             setActiveScreen={setActiveScreen}
             />
 
@@ -271,6 +277,12 @@
         backgroundColor: C.background,
         paddingBottom: 40
     },
+
+    removeBtn: {
+  backgroundColor: C.dangerRed,
+  padding: 10,
+  borderRadius: 30,
+},
 
     // Top bar
     topBar: {
