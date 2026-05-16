@@ -1,8 +1,23 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Modal } from "react-native"
 import { Ionicons } from "@expo/vector-icons";
+
+//DB
 import { getWeather } from "../services/weatherService";
+
+import { getMarineData } from "../services/marineService";
+
+import { getMarineNews } from "../services/newsService";
+
+import {
+  generateWeatherAlerts,
+  generateMarineAlerts,
+  generateNewsAlerts,
+  getMarineAlerts,
+} from "../services/alertsService";
+
 import BottomNav from "../components/ui/BottomNav";
+
 import {
   View,
   Text,
@@ -131,6 +146,8 @@ function AlertCard({
     ]).start();
   }, []);
 
+
+  
   return (
     <Animated.View style={[s.card, { opacity: fade, transform: [{ translateX: slideX }] }]}>
       {/* Left accent bar */}
@@ -235,21 +252,64 @@ export default function AlertsScreen({
 const [showWeatherModal, setShowWeatherModal] =
   useState(false);
 
-  const [criticalAlerts, setCriticalAlerts] =
+  const [setCriticalAlerts] =
   useState(CRITICAL);
+
+  const [marineAlerts, setMarineAlerts] =
+  useState<any[]>([]);
 
   const sosAnim = useRef(new Animated.Value(1)).current;
 
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(sosAnim, { toValue: 1.1, duration: 800, useNativeDriver: true }),
-        Animated.timing(sosAnim, { toValue: 1,   duration: 800, useNativeDriver: true }),
-      ])
-    ).start();
-      loadWeather();
+const hasRun = useRef(false);
 
-  }, []);
+
+
+useEffect(() => {
+
+  if (hasRun.current) return;
+
+  hasRun.current = true;
+
+  async function loadAlerts() {
+    const data = await getMarineAlerts();
+
+    setMarineAlerts(data);
+  }
+
+  async function runAlertSystem() {
+    const weather = await getWeather();
+
+    const marine = await getMarineData();
+
+    const news = await getMarineNews();
+
+    await generateWeatherAlerts(weather);
+
+    await generateMarineAlerts(marine);
+
+    await generateNewsAlerts(news);
+  }
+
+  async function initialize() {
+    await runAlertSystem();
+
+    await loadAlerts();
+
+    await loadWeather();
+  }
+
+  // FIRST LOAD
+  initialize();
+
+  // AUTO REFRESH EVERY 5 SECONDS
+  const interval = setInterval(() => {
+    initialize();
+  }, 30000);
+
+  // CLEANUP
+  return () => clearInterval(interval);
+
+}, []);
 
 const loadWeather = async () => {
   try {
@@ -262,6 +322,19 @@ const loadWeather = async () => {
     console.log("Weather error:", error);
   }
 };
+
+const loadMarineAlerts = async () => {
+  try {
+    const data = await getMarineAlerts();
+
+    console.log("MARINE ALERTS:", data);
+
+    setMarineAlerts(data);
+  } catch (error) {
+    console.log(error);
+  }
+};
+
 
   return (
     <View style={s.root}>
@@ -283,25 +356,28 @@ const loadWeather = async () => {
         {/* ── Critical ── */}
         <View style={s.section}>
           <SectionHeader icon="alert-circle-outline" title="Critical Alerts" color={C.danger} badge="2 Active" />
-          {criticalAlerts.map((item, i) => (
-            <AlertCard
-              key={item.id}
-              icon={item.icon}
-              title={item.title}
-              sub={item.sub}
-              time={item.time}
-              body={item.body}
-              action={item.action}
-              accentColor={C.danger}
-              delay={i * 80}
-              onDismiss={() =>
-  setCriticalAlerts(prev =>
-    prev.filter(alert => alert.id !== item.id)
-  )
-}
-onAction={() =>
-  setActiveScreen("map")
-}
+          {marineAlerts.map((item, i) => (
+                <AlertCard
+                key={item.id}
+                icon={item.icon || "warning-outline"}
+                title={item.title || "No Title"}
+                sub={item.type || "Unknown"}
+                time={""}
+                body={item.description || "No Description"}
+                action={item.action || "View"}
+                accentColor={C.danger}
+                delay={i * 80}
+
+                onDismiss={() =>
+                setMarineAlerts(prev =>
+                    prev.filter(alert => alert.id !== item.id)
+                )
+                }
+onAction={() => {
+  if (item.url) {
+    window.open(item.url, "_blank");
+  }
+}}
             />
           ))}
         </View>
@@ -523,19 +599,7 @@ onAction={() =>
 </Modal>
 
 
-      {/* SOS FAB */}
-      <Animated.View style={[s.sosWrap, { transform: [{ scale: sosAnim }] }]}>
-        <TouchableOpacity style={s.sosBtn} activeOpacity={0.85}>
-          <View style={s.sosBadge}>
-            <Text style={s.sosBadgeTxt}>SOS</Text>
-          </View>
-          <Ionicons
-            name="warning"
-            size={24}
-            color={C.white}
-            />
-        </TouchableOpacity>
-      </Animated.View>
+
 
       {/* TAB BAR */}
 
