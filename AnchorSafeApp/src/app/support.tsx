@@ -15,8 +15,7 @@
     Linking,
     } from 'react-native';
 
-    // ─── Colour tokens (matching original design) ────────────────────────────────
-    const C = {
+const C = {
     primary:             '#005ab3',
     secondary:           '#476083',
     background:          '#F4F9FC',
@@ -151,7 +150,7 @@
         {/* ── Top App Bar ── */}
         <View style={styles.topBar}>
             <View style={styles.topBarLeft}>
-            <Text style={styles.screenTitle}>Profile Settings</Text>
+            <Text style={styles.screenTitle}>Support</Text>
             </View>
             <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7}>
             <Ionicons
@@ -180,72 +179,20 @@
             </View>
             </View>
 
-            {/* ── Navigation Preferences ── */}
-            <SectionHeader title="Navigation Preferences" />
-            <Card>
-            <ToggleRow
-                label="Show Depth Contours"
-                value={showDepth}
-                onChange={setShowDepth}
-            />
-            <ToggleRow
-                label="Automatic Rerouting"
-                value={autoReroute}
-                onChange={setAutoReroute}
-            />
-            <ArrowRow
-                label="Units of Measure"
-                value="Nautical Miles"
-                isLast
-            />
-            </Card>
-
-            {/* ── Notifications ── */}
-            <SectionHeader title="Notifications" />
-            <Card>
-            <ToggleRow
-                label="Proximity Alerts"
-                value={proximity}
-                onChange={setProximity}
-            />
-            <ToggleRow
-                label="Weather Warnings"
-                value={weather}
-                onChange={setWeather}
-            />
-            <ToggleRow
-                label="Environmental Notices"
-                value={envNotices}
-                onChange={setEnvNotices}
-                isLast
-            />
-            </Card>
-
-            {/* ── Safety ── */}
-            <SectionHeader title="Safety" />
-            <Card>
-            <ArrowRow
-                label="Manage Emergency Contacts"
-                 onPress={() => setActiveScreen("emergencyContacts")}
-            />
-            <ArrowRow
-                label="Vessel Finder"
-                externalLink
-                    onPress={() => Linking.openURL("https://www.vesselfinder.com/")}
-            />
-            </Card>
-
             {/* ── About & Support ── */}
-            <SectionHeader title="About & Support" />
+            <SectionHeader title="Get in touch" />
             <Card>
-            <ArrowRow label="Privacy Policy"  externalLink 
-            onPress={()=>Linking.openURL("https://www.anchorsafe.com/privacy-policy")} />
-            <ArrowRow label="Terms of Service" externalLink
-            onPress={()=>Linking.openURL("https://www.anchorsafe.com/terms-of-service")} />
-            <ArrowRow label="Support"
-            onPress={() => setActiveScreen("support")}/>
+            <ArrowRow label="Contact Us"  externalLink 
+            onPress={()=>Linking.openURL("https://www.anchorsafe.com/contact")} />
+            <ArrowRow label="Report an Issue" externalLink
+            onPress={()=>Linking.openURL("https://www.anchorsafe.com/report-an-issue")} />
+            <ArrowRow label="Write a Review" externalLink
+            onPress={()=>Linking.openURL("https://www.anchorsafe.com/write-a-review")} />
             </Card>
-
+            <Card>
+                <ArrowRow label="Go Back to Profile"
+                onPress={() => setActiveScreen("profile")}/>
+            </Card>
             {/* Version info */}
             <View style={styles.versionBlock}>
             <Text style={styles.versionApp}>AnchorSafe App</Text>
@@ -256,7 +203,7 @@
         {/* ── Bottom Navigation Bar ── */}
 
             <BottomNav
-            activeTab="profile"
+            activeTab="support"
             setActiveScreen={setActiveScreen}
             />
 

@@ -1,5 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { Modal } from "react-native"
 import { Ionicons } from "@expo/vector-icons";
+import { getWeather } from "../services/weatherService";
 import BottomNav from "../components/ui/BottomNav";
 import {
   View,
@@ -87,6 +89,9 @@ const NOTICES = [
   },
 ];
 
+
+  
+
 // ─── Alert Card ───────────────────────────────────────────────────────────────
 
 function AlertCard({
@@ -96,10 +101,12 @@ function AlertCard({
   time,
   body,
   action,
+  onAction,
   accentColor,
   cta,
   ctaPrimary,
   delay,
+  onDismiss,
 }: {
   icon: string;
   title: string;
@@ -111,6 +118,8 @@ function AlertCard({
   cta?: string | null;
   ctaPrimary?: boolean;
   delay: number;
+  onDismiss?: () => void;
+  onAction?: () => void;
 }) {
   const fade  = useRef(new Animated.Value(0)).current;
   const slideX = useRef(new Animated.Value(-16)).current;
@@ -155,7 +164,8 @@ function AlertCard({
         {/* Actions */}
         <View style={s.cardActions}>
           {action && (
-            <TouchableOpacity style={s.linkBtn}>
+            <TouchableOpacity style={s.linkBtn}
+  onPress={onAction}>
               <Text style={[s.linkBtnText, { color: C.primary }]}>{action} →</Text>
             </TouchableOpacity>
           )}
@@ -165,7 +175,11 @@ function AlertCard({
             </TouchableOpacity>
           )}
           {accentColor === C.danger && (
-            <TouchableOpacity style={s.dismissBtn}>
+<TouchableOpacity
+  style={s.dismissBtn}
+  onPress={onDismiss}
+                
+                >
               <Text style={s.dismissText}>Dismiss</Text>
             </TouchableOpacity>
           )}
@@ -214,7 +228,16 @@ function SectionHeader({
 export default function AlertsScreen({
   setActiveScreen,
 }: any) {
-  const [activeTab, setActiveTab] = useState('alerts');
+
+    const [weatherData, setWeatherData] =
+  useState<any>(null);
+
+const [showWeatherModal, setShowWeatherModal] =
+  useState(false);
+
+  const [criticalAlerts, setCriticalAlerts] =
+  useState(CRITICAL);
+
   const sosAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -224,7 +247,21 @@ export default function AlertsScreen({
         Animated.timing(sosAnim, { toValue: 1,   duration: 800, useNativeDriver: true }),
       ])
     ).start();
+      loadWeather();
+
   }, []);
+
+const loadWeather = async () => {
+  try {
+    const data = await getWeather();
+
+    console.log("WEATHER DATA:", data);
+
+    setWeatherData(data);
+  } catch (error) {
+    console.log("Weather error:", error);
+  }
+};
 
   return (
     <View style={s.root}>
@@ -246,7 +283,7 @@ export default function AlertsScreen({
         {/* ── Critical ── */}
         <View style={s.section}>
           <SectionHeader icon="alert-circle-outline" title="Critical Alerts" color={C.danger} badge="2 Active" />
-          {CRITICAL.map((item, i) => (
+          {criticalAlerts.map((item, i) => (
             <AlertCard
               key={item.id}
               icon={item.icon}
@@ -257,6 +294,14 @@ export default function AlertsScreen({
               action={item.action}
               accentColor={C.danger}
               delay={i * 80}
+              onDismiss={() =>
+  setCriticalAlerts(prev =>
+    prev.filter(alert => alert.id !== item.id)
+  )
+}
+onAction={() =>
+  setActiveScreen("map")
+}
             />
           ))}
         </View>
@@ -271,10 +316,20 @@ export default function AlertsScreen({
               title={item.title}
               sub={item.sub}
               time={item.time}
-              body={item.body}
+                body={
+                weatherData &&
+                weatherData.weather &&
+                weatherData.main &&
+                weatherData.wind
+                    ? `${weatherData.weather[0]?.description}. Wind speed: ${weatherData.wind?.speed} m/s. Temperature: ${weatherData.main?.temp}°C`
+                    : "Loading weather data..."
+                }
               action={item.action}
               accentColor={C.warning}
               delay={160 + i * 80}
+              onAction={() =>
+  setShowWeatherModal(true)
+}
             />
           ))}
         </View>
@@ -298,6 +353,175 @@ export default function AlertsScreen({
           ))}
         </View>
       </ScrollView>
+
+          <Modal
+  visible={showWeatherModal}
+  transparent={true}
+  animationType="fade"
+>
+  <View
+    style={{
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.7)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 20,
+    }}
+  >
+    <View
+      style={{
+        width: "100%",
+        backgroundColor: "#0F172A",
+        borderRadius: 30,
+        padding: 25,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <Text
+          style={{
+            color: "white",
+            fontSize: 24,
+            fontWeight: "bold",
+          }}
+        >
+          Weather Details
+        </Text>
+
+        <Text style={{ fontSize: 42 }}>
+          🌤️
+        </Text>
+      </View>
+
+      <Text
+        style={{
+          color: "white",
+          fontSize: 60,
+          fontWeight: "bold",
+          marginTop: 20,
+        }}
+      >
+        {weatherData?.main?.temp
+          ? `${Math.round(weatherData.main.temp)}°`
+          : "--°"}
+      </Text>
+
+      <Text
+        style={{
+          color: "#CBD5E1",
+          fontSize: 18,
+          marginTop: 5,
+          textTransform: "capitalize",
+        }}
+      >
+        {weatherData?.weather?.[0]?.description || "Loading..."}
+      </Text>
+
+      <View style={{ marginTop: 30 }}>
+        <View
+          style={{
+            backgroundColor: "rgba(255,255,255,0.08)",
+            padding: 16,
+            borderRadius: 18,
+            marginBottom: 14,
+          }}
+        >
+          <Text style={{ color: "#94A3B8" }}>
+            Wind Speed
+          </Text>
+
+          <Text
+            style={{
+              color: "white",
+              fontSize: 20,
+              fontWeight: "700",
+              marginTop: 5,
+            }}
+          >
+            💨 {weatherData?.wind?.speed || 0} m/s
+          </Text>
+        </View>
+
+        <View
+          style={{
+            backgroundColor: "rgba(255,255,255,0.08)",
+            padding: 16,
+            borderRadius: 18,
+            marginBottom: 14,
+          }}
+        >
+          <Text style={{ color: "#94A3B8" }}>
+            Humidity
+          </Text>
+
+          <Text
+            style={{
+              color: "white",
+              fontSize: 20,
+              fontWeight: "700",
+              marginTop: 5,
+            }}
+          >
+            💧 {weatherData?.main?.humidity || 0}%
+          </Text>
+        </View>
+
+        <View
+          style={{
+            backgroundColor: "rgba(255,255,255,0.08)",
+            padding: 16,
+            borderRadius: 18,
+          }}
+        >
+          <Text style={{ color: "#94A3B8" }}>
+            Feels Like
+          </Text>
+
+          <Text
+            style={{
+              color: "white",
+              fontSize: 20,
+              fontWeight: "700",
+              marginTop: 5,
+            }}
+          >
+            🌡{" "}
+            {weatherData?.main?.feels_like
+              ? `${Math.round(weatherData.main.feels_like)}°`
+              : "--°"}
+          </Text>
+        </View>
+      </View>
+
+      <TouchableOpacity
+        onPress={() => setShowWeatherModal(false)}
+        style={{
+          backgroundColor: "#2563EB",
+          paddingVertical: 16,
+          borderRadius: 18,
+          marginTop: 30,
+          alignItems: "center",
+        }}
+      >
+        <Text
+          style={{
+            color: "white",
+            fontWeight: "700",
+            fontSize: 16,
+          }}
+        >
+          Close
+        </Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
+
 
       {/* SOS FAB */}
       <Animated.View style={[s.sosWrap, { transform: [{ scale: sosAnim }] }]}>
@@ -410,7 +634,7 @@ const s = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: '500',
     fontFamily: Platform.OS === 'ios' ? 'Helvetica Neue' : 'sans-serif-medium',
   },
   badge: {
