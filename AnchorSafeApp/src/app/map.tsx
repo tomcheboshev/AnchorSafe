@@ -40,12 +40,13 @@ function LeafletMap({
   selectedZoneId,
   onZonePress,
   zones,
+  iframeRef,
 }: {
   selectedZoneId: string;
   onZonePress: (id: string) => void;
   zones: any[];
+  iframeRef: any;
 }) {
-  const iframeRef = React.useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     if (!IS_WEB) return;
@@ -134,11 +135,35 @@ window.addEventListener('message', function(e) {
     }
   }
 
-  if (msg.type === 'selectZone') {
-    if (polys[selectedId]) polys[selectedId].setStyle({ weight:2, opacity:0.65 });
-    selectedId = msg.id;
-    if (polys[selectedId]) polys[selectedId].setStyle({ weight:3, opacity:1 });
+if (msg.type === 'flyTo') {
+
+  map.flyTo(
+    [msg.lat, msg.lng],
+    14,
+    {
+      duration: 2,
+    }
+  );
+}
+
+if (msg.type === 'selectZone') {
+
+  if (polys[selectedId]) {
+    polys[selectedId].setStyle({
+      weight: 2,
+      opacity: 0.65
+    });
   }
+
+  selectedId = msg.id;
+
+  if (polys[selectedId]) {
+    polys[selectedId].setStyle({
+      weight: 3,
+      opacity: 1
+    });
+  }
+}
 });
 <\/script></body></html>`, []);
 
@@ -180,7 +205,26 @@ function Chip({ icon, value }: { icon: string; value: string }) {
 export default function MapScreen({ setActiveScreen }: any) {
   const [search, setSearch] = useState('');
   const [focused, setFocused] = useState(false);
+
+    const iframeRef =
+  React.useRef<HTMLIFrameElement>(
+    null
+  );
+
   const [zones, setZones] = useState<any[]>([]);
+
+
+  const filteredZones =
+  zones.filter((z: any) =>
+    z.name
+      ?.toLowerCase()
+      .includes(
+        search.toLowerCase()
+      )
+  );
+
+
+
   const [selectedId, setSelectedId] = useState('');
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -273,14 +317,63 @@ export default function MapScreen({ setActiveScreen }: any) {
 
   const cardH = cardAnim.interpolate({ inputRange: [0, 1], outputRange: [96, 228] });
 
-  const selectZone = (id: string) => {
-    setSelectedId(id);
-    setExpanded(false);
-  };
+const selectZone = (
+  id: string
+) => {
+
+  setSelectedId(id);
+
+  const zone =
+    zones.find(
+      (z: any) => z.id === id
+    );
+
+  if (!zone) return;
+
+  const coords =
+    zone.coords;
+
+  if (!coords?.length) return;
+
+  const centerLat =
+    coords.reduce(
+      (
+        sum: number,
+        c: number[]
+      ) => sum + c[0],
+      0
+    ) / coords.length;
+
+  const centerLng =
+    coords.reduce(
+      (
+        sum: number,
+        c: number[]
+      ) => sum + c[1],
+      0
+    ) / coords.length;
+
+  iframeRef.current
+  ?.contentWindow
+  ?.postMessage(
+    {
+      type: "flyTo",
+      lat: centerLat,
+      lng: centerLng,
+    },
+    "*"
+  );
+};
+
 
   return (
     <View style={s.root}>
-      <LeafletMap selectedZoneId={selectedId} onZonePress={selectZone} zones={zones} />
+<LeafletMap
+  selectedZoneId={selectedId}
+  onZonePress={selectZone}
+  zones={zones}
+  iframeRef={iframeRef}
+/>
 
       <View style={s.header}>
         <View style={s.headerRow}>
@@ -292,15 +385,29 @@ export default function MapScreen({ setActiveScreen }: any) {
         <View style={s.searchWrap}>
           <View style={[s.searchBar, focused && s.searchFocused]}>
             <Ionicons name="search" size={18} color={C.sub} />
-            <TextInput
-              style={s.searchInput}
-              placeholder="Search zones, ports, or marinas"
-              placeholderTextColor={C.sub}
-              value={search}
-              onChangeText={setSearch}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-            />
+<TextInput
+  style={s.searchInput}
+  placeholder="Search zones, ports, or marinas"
+  placeholderTextColor={C.sub}
+  value={search}
+  onChangeText={setSearch}
+
+  onSubmitEditing={() => {
+
+    if (
+      filteredZones.length > 0
+    ) {
+
+      selectZone(
+        filteredZones[0].id
+      );
+    }
+
+  }}
+
+  onFocus={() => setFocused(true)}
+  onBlur={() => setFocused(false)}
+/>
             {search.length > 0 && (
               <TouchableOpacity onPress={() => setSearch('')}>
                 <Text style={{ color: C.sub, fontSize: 13 }}>✕</Text>
@@ -383,7 +490,7 @@ export default function MapScreen({ setActiveScreen }: any) {
             style={{ marginTop: 8 }}
             contentContainerStyle={{ paddingHorizontal: 14, gap: 8 }}
           >
-            {zones.map((z: any) => {
+            {filteredZones.map((z: any) => {
               const active = z.id === selectedId;
               const col = zoneColor(z.type);
               return (
@@ -428,7 +535,7 @@ const s = StyleSheet.create({
     boxShadow: '0px 2px 8px rgba(0,0,0,0.10)',
     elevation: 4,
   },
-  searchFocused: { borderColor: C.primary, backgroundColor: '#fff' },
+  searchFocused: {  backgroundColor: '#fff' },
   searchInput: { flex: 1, fontSize: 15, color: C.text },
 
   sosWrap: { position: 'absolute', right: 16, bottom: 220, zIndex: 20 },
