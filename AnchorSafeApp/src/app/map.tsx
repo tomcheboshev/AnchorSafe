@@ -1,73 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Ionicons } from "@expo/vector-icons";
 import BottomNav from "../components/ui/BottomNav";
+import { connectAISStream, disconnectAISStream } from "../services/aisService";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  ScrollView,
-  Animated,
-  Dimensions,
-  Platform,
+  View, Text, StyleSheet, TouchableOpacity,
+  TextInput, ScrollView, Animated, Platform,
 } from 'react-native';
 
-const { width, height } = Dimensions.get('window');
+import { geoJsonToZones } from '../data/geoJsonToZones';
+import data from '../data/data.json';
+
 const IS_WEB = Platform.OS === 'web';
-
-// ─── Data ─────────────────────────────────────────────────────────────────────
-
-import { geoJsonToZones } from '../data/geoJsonToZones'
-
-import safe from '../data/safe.json';
-import data from '../data/data.json'
 const ZONES = geoJsonToZones(data);
-
-const USELESSZONES = [
-  {
-    id: 'z1',
-    name: 'Blue Lagoon',
-    type: 'safe',
-    subtitle: 'Sandy Bed • 12.5m Depth',
-    temp: '24°',
-    wind: '8kt',
-    color: '#34C759',
-    fillColor: 'rgba(52,199,89,0.25)',
-    coords: [
-      [35.884, 14.336], [35.891, 14.338], [35.893, 14.347],
-      [35.887, 14.352], [35.882, 14.345],
-    ],
-  },
-  {
-    id: 'z2',
-    name: 'Rocky Shoals',
-    type: 'danger',
-    subtitle: 'Rock Bed • 2.1m Depth',
-    temp: '22°',
-    wind: '14kt',
-    color: '#FF3B30',
-    fillColor: 'rgba(255,59,48,0.22)',
-    coords: [
-      [35.889, 14.348], [35.893, 14.350], [35.895, 14.358],
-      [35.891, 14.362], [35.886, 14.354],
-    ],
-  },
-  {
-    id: 'z3',
-    name: 'South Cove',
-    type: 'caution',
-    subtitle: 'Mixed Bed • 6.8m Depth',
-    temp: '23°',
-    wind: '11kt',
-    color: '#FFCC00',
-    fillColor: 'rgba(255,204,0,0.22)',
-    coords: [
-      [35.881, 14.351], [35.885, 14.355], [35.887, 14.363],
-      [35.882, 14.368], [35.878, 14.360],
-    ],
-  },
-];
 
 const C = {
   primary: '#1A6FA8',
@@ -80,12 +24,20 @@ const C = {
   sos: '#FF3B30',
 };
 
-// ─── Leaflet Map via iframe (Web only) ───────────────────────────────────────
+const zoneColor = (type: string) =>
+  type === 'safe' ? C.safe : type === 'danger' ? C.danger : C.caution;
 
-function LeafletMap({ selectedZoneId, onZonePress }: {
+// ─── Leaflet Map ──────────────────────────────────────────────────────────────
+
+function LeafletMap({
+  selectedZoneId,
+  onZonePress,
+}: {
   selectedZoneId: string;
   onZonePress: (id: string) => void;
 }) {
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+
   useEffect(() => {
     if (!IS_WEB) return;
     const handler = (e: MessageEvent) => {
@@ -95,34 +47,87 @@ function LeafletMap({ selectedZoneId, onZonePress }: {
     return () => window.removeEventListener('message', handler);
   }, [onZonePress]);
 
+  useEffect(() => {
+    if (!IS_WEB || !iframeRef.current?.contentWindow) return;
+    iframeRef.current.contentWindow.postMessage({ type: 'selectZone', id: selectedZoneId }, '*');
+  }, [selectedZoneId]);
+
   const zonesJson = JSON.stringify(
     ZONES.map((z: any) => ({ id: z.id, coords: z.coords, color: z.color }))
   );
 
-  const html = `<!DOCTYPE html><html><head>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-  <style>*{margin:0;padding:0}html,body,#map{width:100%;height:100%}</style>
-  </head><body><div id="map"></div><script>
-  var map=L.map('map',{center:[45.549,13.7276],zoom:14,zoomControl:false,attributionControl:false});
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(map);
-  var zones=${zonesJson};
-  var selected='${selectedZoneId}';
-  zones.forEach(function(z){
-    var poly=L.polygon(z.coords,{color:z.color,fillColor:z.color,fillOpacity:0.22,weight:selected===z.id?3:2,opacity:selected===z.id?1:0.65}).addTo(map);
-    poly.on('click',function(){window.parent.postMessage({type:'zonePress',id:z.id},'*');});
+  const html = React.useMemo(() => `<!DOCTYPE html><html><head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>*{margin:0;padding:0}html,body,#map{width:100%;height:100%}</style>
+</head><body><div id="map"></div><script>
+var map = L.map('map', { center:[45.549,13.7276], zoom:14, zoomControl:false, attributionControl:false });
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19 }).addTo(map);
+
+var zones = ${zonesJson};
+var polys = {};
+var selectedId = 'z1';
+var shipMarkers = {};
+
+zones.forEach(function(z) {
+  var poly = L.polygon(z.coords, { color:z.color, fillColor:z.color, fillOpacity:0.22, weight:2, opacity:0.65 }).addTo(map);
+  poly.on('click', function() { window.parent.postMessage({ type:'zonePress', id:z.id }, '*'); });
+  polys[z.id] = poly;
+});
+
+var userIcon = L.divIcon({
+  html: '<div style="width:14px;height:14px;background:#1A6FA8;border-radius:50%;border:3px solid white;box-shadow:0 0 0 3px rgba(26,111,168,0.3);"></div>',
+  iconSize: [14,14], iconAnchor: [7,7], className: ''
+});
+L.marker([45.549, 13.7276], { icon: userIcon }).addTo(map);
+
+function makeShipIcon(heading) {
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">'
+    + '<g transform="rotate(' + (heading || 0) + ',14,14)">'
+    + '<polygon points="14,2 20,22 14,18 8,22" fill="#1A6FA8" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>'
+    + '</g></svg>';
+  return L.divIcon({
+    html: '<div style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));">' + svg + '</div>',
+    iconSize: [28,28], iconAnchor: [14,14], className: ''
   });
-  var ai=L.divIcon({html:'<div style="background:rgba(255,255,255,0.95);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 3px 8px rgba(0,0,0,0.25);">⚓</div>',iconSize:[36,36],iconAnchor:[18,18],className:''});
-  L.marker([35.889,14.343],{icon:ai}).addTo(map);
-  L.marker([35.892,14.355],{icon:ai}).addTo(map);
-  var ui=L.divIcon({html:'<div style="width:14px;height:14px;background:#1A6FA8;border-radius:50%;border:3px solid white;box-shadow:0 0 0 3px rgba(26,111,168,0.3);"></div>',iconSize:[14,14],iconAnchor:[7,7],className:''});
-  L.marker([45.549,13.7276],{icon:ui}).addTo(map);
-  </script></body></html>`;
+}
+
+function makePopup(s) {
+  return '<div style="font-family:sans-serif;min-width:160px;padding:4px 0;">'
+    + '<b style="color:#1A6FA8;font-size:13px;">MMSI: ' + s.mmsi + '</b><br/>'
+    + '<span style="color:#555;font-size:12px;">Speed: ' + s.speed.toFixed(1) + ' kn &nbsp;|&nbsp; HDG: ' + s.heading + '°</span>'
+    + '</div>';
+}
+
+window.addEventListener('message', function(e) {
+  var msg = e.data;
+  if (!msg) return;
+
+  if (msg.type === 'shipUpdate') {
+    var s = msg.ship;
+    if (shipMarkers[s.mmsi]) {
+      shipMarkers[s.mmsi].setLatLng([s.latitude, s.longitude]);
+      shipMarkers[s.mmsi].setIcon(makeShipIcon(s.heading));
+    } else {
+      shipMarkers[s.mmsi] = L.marker([s.latitude, s.longitude], { icon: makeShipIcon(s.heading) })
+        .addTo(map)
+        .bindPopup(makePopup(s));
+    }
+  }
+
+  if (msg.type === 'selectZone') {
+    if (polys[selectedId]) polys[selectedId].setStyle({ weight:2, opacity:0.65 });
+    selectedId = msg.id;
+    if (polys[selectedId]) polys[selectedId].setStyle({ weight:3, opacity:1 });
+  }
+});
+<\/script></body></html>`, []);
 
   if (!IS_WEB) return null;
   return (
     <iframe
+      ref={iframeRef}
       srcDoc={html}
       style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' } as any}
       sandbox="allow-scripts allow-same-origin"
@@ -130,10 +135,10 @@ function LeafletMap({ selectedZoneId, onZonePress }: {
   );
 }
 
-// ─── UI Atoms ─────────────────────────────────────────────────────────────────
+// ─── Atoms ────────────────────────────────────────────────────────────────────
 
 function ZoneIcon({ type }: { type: string }) {
-  const bg = type === 'safe' ? C.safe : type === 'danger' ? C.danger : C.caution;
+  const bg = zoneColor(type);
   return (
     <View style={[s.zoneIconWrap, { backgroundColor: bg + '22' }]}>
       <View style={[s.zoneIconInner, { backgroundColor: bg }]}>
@@ -154,22 +159,26 @@ function Chip({ icon, value }: { icon: string; value: string }) {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export default function MapScreen({
-  setActiveScreen,
-}: any) {
+export default function MapScreen({ setActiveScreen }: any) {
   const [search, setSearch] = useState('');
   const [focused, setFocused] = useState(false);
-  const [activeTab, setActiveTab] = useState('map');
-  const [selectedId, setSelectedId] = useState('z1');
+  const [selectedId, setSelectedId] = useState(ZONES[0]?.id ?? 'z1');
   const [expanded, setExpanded] = useState(false);
 
   const cardAnim = React.useRef(new Animated.Value(0)).current;
   const sosAnim = React.useRef(new Animated.Value(1)).current;
 
   const zone = ZONES.find((z: any) => z.id === selectedId) ?? ZONES[0];
-  const zc = zone.type === 'safe' ? C.safe : zone.type === 'danger' ? C.danger : C.caution;
+  const zc = zoneColor(zone.type);
 
-  
+  useEffect(() => {
+    connectAISStream((ship) => {
+      const iframe = document.querySelector('iframe') as HTMLIFrameElement;
+      iframe?.contentWindow?.postMessage({ type: 'shipUpdate', ship }, '*');
+    });
+    return () => disconnectAISStream();
+  }, []);
+
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
@@ -183,40 +192,32 @@ export default function MapScreen({
     Animated.spring(cardAnim, {
       toValue: expanded ? 1 : 0,
       useNativeDriver: false,
-      tension: 55, friction: 10,
+      tension: 55,
+      friction: 10,
     }).start();
   }, [expanded]);
 
   const cardH = cardAnim.interpolate({ inputRange: [0, 1], outputRange: [96, 228] });
 
+  const selectZone = (id: string) => {
+    setSelectedId(id);
+    setExpanded(false);
+  };
 
   return (
     <View style={s.root}>
-      {/* MAP */}
-      <LeafletMap
-        selectedZoneId={selectedId}
-        onZonePress={id => { setSelectedId(id); setExpanded(false); }}
-      />
+      <LeafletMap selectedZoneId={selectedId} onZonePress={selectZone} />
 
-      {/* HEADER */}
       <View style={s.header}>
         <View style={s.headerRow}>
           <View style={s.headerLeft}>
-            <Ionicons
-  name="boat-outline"
-  size={32}
-  color={C.primary}
-/>
+            <Ionicons name="boat-outline" size={32} color={C.primary} />
             <Text style={s.headerTitle}>AnchorSafe</Text>
           </View>
         </View>
         <View style={s.searchWrap}>
           <View style={[s.searchBar, focused && s.searchFocused]}>
-            <Ionicons
-  name="search"
-  size={18}
-  color={C.sub}
-/>
+            <Ionicons name="search" size={18} color={C.sub} />
             <TextInput
               style={s.searchInput}
               placeholder="Search zones, ports, or marinas"
@@ -235,32 +236,16 @@ export default function MapScreen({
         </View>
       </View>
 
-      {/* MAP CONTROLS */}
-      <View style={s.mapControls}>
-        {['◎', '＋', '－'].map((icon, i) => (
-          <TouchableOpacity key={i} style={s.mapBtn}>
-            <Text style={s.mapBtnTxt}>{icon}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* SOS */}
       <Animated.View style={[s.sosWrap, { transform: [{ scale: sosAnim }] }]}>
         <TouchableOpacity style={s.sosBtn} activeOpacity={0.85}>
           <View style={s.sosBadge}>
             <Text style={s.sosBadgeTxt}>SOS</Text>
           </View>
-          <Ionicons
-            name="warning"
-            size={24}
-            color={C.white}
-          />
+          <Ionicons name="warning" size={24} color={C.white} />
         </TouchableOpacity>
       </Animated.View>
 
-      {/* BOTTOM */}
       <View style={s.bottom}>
-        {/* Zone Card */}
         <TouchableOpacity activeOpacity={0.97} onPress={() => setExpanded(v => !v)}>
           <Animated.View style={[s.card, { minHeight: cardH }]}>
             <View style={s.cardRow}>
@@ -313,7 +298,6 @@ export default function MapScreen({
           </Animated.View>
         </TouchableOpacity>
 
-        {/* Zone Pills */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -322,12 +306,12 @@ export default function MapScreen({
         >
           {ZONES.map((z: any) => {
             const active = z.id === selectedId;
-            const col = z.type === 'safe' ? C.safe : z.type === 'danger' ? C.danger : C.caution;
+            const col = zoneColor(z.type);
             return (
               <TouchableOpacity
                 key={z.id}
                 style={[s.zonePill, active && { backgroundColor: col, borderColor: col }]}
-                onPress={() => { setSelectedId(z.id); setExpanded(false); }}
+                onPress={() => selectZone(z.id)}
               >
                 <View style={[s.zoneDot, { backgroundColor: active ? '#fff' : col }]} />
                 <Text style={[s.zonePillTxt, { color: active ? '#fff' : C.text }]}>{z.name}</Text>
@@ -337,13 +321,7 @@ export default function MapScreen({
         </ScrollView>
       </View>
 
-      {/* TAB BAR */}
-
-          <BottomNav
-            activeTab="map"
-            setActiveScreen={setActiveScreen}
-            />
-
+      <BottomNav activeTab="map" setActiveScreen={setActiveScreen} />
     </View>
   );
 }
@@ -360,19 +338,8 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(236,241,247,0.96)',
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  headerAnchor: { fontSize: 20, color: C.primary },
-  headerTitle: {
-    fontSize: 22, fontWeight: '700', color: C.primary,
-  },
-  headerBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.6)',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  searchWrap: {
-    paddingHorizontal: 16, paddingBottom: 12,
-    backgroundColor: 'rgba(236,241,247,0.96)',
-  },
+  headerTitle: { fontSize: 22, fontWeight: '700', color: C.primary },
+  searchWrap: { paddingHorizontal: 16, paddingBottom: 12, backgroundColor: 'rgba(236,241,247,0.96)' },
   searchBar: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: 'rgba(255,255,255,0.88)', borderRadius: 16,
@@ -383,18 +350,6 @@ const s = StyleSheet.create({
   },
   searchFocused: { borderColor: C.primary, backgroundColor: '#fff' },
   searchInput: { flex: 1, fontSize: 15, color: C.text },
-
-  mapControls: {
-    position: 'absolute', right: 16, top: '42%', gap: 8, zIndex: 5,
-  },
-  mapBtn: {
-    width: 44, height: 44, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12, shadowRadius: 6, elevation: 4,
-  },
-  mapBtnTxt: { fontSize: 20, color: C.primary, fontWeight: '300' },
 
   sosWrap: { position: 'absolute', right: 16, bottom: 220, zIndex: 20 },
   sosBtn: {
@@ -412,7 +367,6 @@ const s = StyleSheet.create({
   sosBadgeTxt: { fontSize: 9, fontWeight: '800', color: C.sos, letterSpacing: 0.5 },
 
   bottom: { position: 'absolute', bottom: 76, left: 0, right: 0, zIndex: 10 },
-
   card: {
     marginHorizontal: 12, backgroundColor: 'rgba(255,255,255,0.94)',
     borderRadius: 20, paddingTop: 16, paddingHorizontal: 16, paddingBottom: 16,
@@ -422,10 +376,7 @@ const s = StyleSheet.create({
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   cardTitle: { fontSize: 15, fontWeight: '700', color: C.text, letterSpacing: -0.2 },
   cardSub: { fontSize: 12, color: C.sub, marginTop: 2 },
-  pill: {
-    width: 36, height: 4, backgroundColor: 'rgba(0,0,0,0.12)',
-    borderRadius: 2, alignSelf: 'center', marginTop: 14,
-  },
+  pill: { width: 36, height: 4, backgroundColor: 'rgba(0,0,0,0.12)', borderRadius: 2, alignSelf: 'center', marginTop: 14 },
 
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
@@ -435,14 +386,8 @@ const s = StyleSheet.create({
   chipIcon: { fontSize: 12 },
   chipVal: { fontSize: 12, fontWeight: '700', color: C.primary },
 
-  zoneIconWrap: {
-    width: 44, height: 44, borderRadius: 14,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  zoneIconInner: {
-    width: 28, height: 28, borderRadius: 9,
-    justifyContent: 'center', alignItems: 'center',
-  },
+  zoneIconWrap: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  zoneIconInner: { width: 28, height: 28, borderRadius: 9, justifyContent: 'center', alignItems: 'center' },
   zoneIconText: { fontSize: 14, fontWeight: '800', color: '#fff' },
 
   divider: { height: 1, marginBottom: 14, borderRadius: 1 },
@@ -466,15 +411,4 @@ const s = StyleSheet.create({
   },
   zoneDot: { width: 7, height: 7, borderRadius: 4 },
   zonePillTxt: { fontSize: 13, fontWeight: '600' },
-
-  tabBar: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.96)',
-    borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)',
-    paddingBottom: Platform.OS === 'ios' ? 20 : 6, zIndex: 20,
-  },
-  tabItem: { flex: 1, alignItems: 'center', paddingTop: 10, paddingBottom: 4, gap: 3, position: 'relative' },
-  tabDot: { position: 'absolute', top: 0, width: 24, height: 3, borderRadius: 2, backgroundColor: C.primary },
-  tabIcon: { fontSize: 20 },
-  tabLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.1 },
 });
