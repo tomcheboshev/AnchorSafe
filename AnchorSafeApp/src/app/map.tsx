@@ -15,8 +15,11 @@ import BottomNav from "../components/ui/BottomNav";
 import { connectAISStream, disconnectAISStream } from "../services/aisService";
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  TextInput, ScrollView, Animated, Platform,
+  TextInput, ScrollView, Animated, Platform, Alert,
 } from 'react-native';
+
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase';
 
 const IS_WEB = Platform.OS === 'web';
 
@@ -202,6 +205,24 @@ function Chip({ icon, value }: { icon: string; value: string }) {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
+export const sendSOSReport = async (reportData: any) => {
+  try {
+    // We swap out the manual dates for Firebase's accurate server timestamps
+    const dataToSave = {
+      ...reportData,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    const docRef = await addDoc(collection(db, 'sos_reports'), dataToSave);
+    console.log("Document written with ID: ", docRef.id);
+    return true;
+  } catch (error) {
+    console.error("Firebase Error adding document: ", error);
+    throw error;
+  }
+};
+
 export default function MapScreen({ setActiveScreen }: any) {
   const [search, setSearch] = useState('');
   const [focused, setFocused] = useState(false);
@@ -223,6 +244,64 @@ export default function MapScreen({ setActiveScreen }: any) {
       )
   );
 
+  
+  // --- SOS Logic ---
+  
+  const submitSOS = async () => {
+    // Construct the payload matching your schema
+    const sosData = {
+      boatName: "Sea Explorer",       // Replace with dynamic user context
+      coordinates: {
+        lat: 45.549,                  // Replace with actual user GPS coordinates
+        lng: 13.7276
+      },
+      createdAt: new Date().toISOString(), // Use DB timestamp (e.g., serverTimestamp() in Firebase)
+      emergencyType: "GENERAL_EMERGENCY",
+      message: "Immediate assistance required.",
+      peopleOnBoard: 4,
+      requiresImmediateRescue: true,
+      resolvedAt: null,
+      severity: "HIGH",
+      status: "ACTIVE",
+      updatedAt: new Date().toISOString(),
+      userId: "user_01",              // Replace with dynamic user ID
+      userName: "Tomche Bosev"        // Replace with dynamic user Name
+    };
+
+    try {
+      await sendSOSReport(sosData);
+      
+      if (IS_WEB) {
+        window.alert("SOS Sent. Emergency services have been notified.");
+      } else {
+        Alert.alert("SOS Sent", "Emergency services have been notified.");
+      }
+    } catch (error) {
+      if (IS_WEB) {
+        window.alert("Failed to send SOS. Check connection.");
+      } else {
+        Alert.alert("Error", "Failed to send SOS. Check connection.");
+      }
+    }
+  };
+
+  const handleSOSPress = () => {
+    // Prevent accidental taps by asking for confirmation
+    if (IS_WEB) {
+      if (window.confirm("EMERGENCY SOS: Are you sure you want to send an emergency distress signal?")) {
+        submitSOS();
+      }
+    } else {
+      Alert.alert(
+        "EMERGENCY SOS",
+        "Are you sure you want to send an emergency distress signal?",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "SEND SOS", style: "destructive", onPress: submitSOS }
+        ]
+      );
+    }
+  };
 
 
   const [selectedId, setSelectedId] = useState('');
@@ -418,7 +497,7 @@ const selectZone = (
       </View>
 
       <Animated.View style={[s.sosWrap, { transform: [{ scale: sosAnim }] }]}>
-        <TouchableOpacity style={s.sosBtn} activeOpacity={0.85}>
+        <TouchableOpacity style={s.sosBtn} activeOpacity={0.85}onPress={handleSOSPress}>
           <View style={s.sosBadge}>
             <Text style={s.sosBadgeTxt}>SOS</Text>
           </View>
