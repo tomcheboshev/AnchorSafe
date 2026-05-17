@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { loadCachedShips, upsertShip } from '../services/shipCacheService';
 import { Ionicons } from "@expo/vector-icons";
 import BottomNav from "../components/ui/BottomNav";
 import { connectAISStream, disconnectAISStream } from "../services/aisService";
@@ -130,7 +131,7 @@ window.addEventListener('message', function(e) {
       ref={iframeRef}
       srcDoc={html}
       style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' } as any}
-      sandbox="allow-scripts allow-same-origin"
+      sandbox="allow-scripts"
     />
   );
 }
@@ -171,30 +172,40 @@ export default function MapScreen({ setActiveScreen }: any) {
   const zone = ZONES.find((z: any) => z.id === selectedId) ?? ZONES[0];
   const zc = zoneColor(zone.type);
 
-  useEffect(() => {
-    connectAISStream((ship) => {
-      const iframe = document.querySelector('iframe') as HTMLIFrameElement;
+useEffect(() => {
+  const iframe = document.querySelector('iframe') as HTMLIFrameElement;
+
+  loadCachedShips().then((cached) => {
+    cached.forEach((ship) => {
       iframe?.contentWindow?.postMessage({ type: 'shipUpdate', ship }, '*');
     });
-    return () => disconnectAISStream();
-  }, []);
+  });
+
+  connectAISStream((ship) => {
+    iframe?.contentWindow?.postMessage({ type: 'shipUpdate', ship }, '*');
+    upsertShip(ship);
+  });
+
+  return () => disconnectAISStream();
+}, []);
 
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(sosAnim, { toValue: 1.1, duration: 850, useNativeDriver: true }),
-        Animated.timing(sosAnim, { toValue: 1, duration: 850, useNativeDriver: true }),
+        Animated.timing(sosAnim, { toValue: 1.1, duration: 850, useNativeDriver: false }),
+        Animated.timing(sosAnim, { toValue: 1, duration: 850, useNativeDriver: false }),
       ])
     ).start();
   }, []);
 
   useEffect(() => {
-    Animated.spring(cardAnim, {
-      toValue: expanded ? 1 : 0,
-      useNativeDriver: false,
-      tension: 55,
-      friction: 10,
-    }).start();
+// Card animation — смени:
+Animated.spring(cardAnim, {
+  toValue: expanded ? 1 : 0,
+  useNativeDriver: false, // ← веќе е false, ОК
+  tension: 55,
+  friction: 10,
+}).start();
   }, [expanded]);
 
   const cardH = cardAnim.interpolate({ inputRange: [0, 1], outputRange: [96, 228] });
@@ -345,19 +356,19 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.88)', borderRadius: 16,
     paddingHorizontal: 14, height: 46,
     borderWidth: 1.5, borderColor: 'transparent',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10, shadowRadius: 8, elevation: 4,
+    boxShadow: '0px 2px 8px rgba(0,0,0,0.10)',
+    elevation: 4,
   },
   searchFocused: { borderColor: C.primary, backgroundColor: '#fff' },
   searchInput: { flex: 1, fontSize: 15, color: C.text },
 
   sosWrap: { position: 'absolute', right: 16, bottom: 220, zIndex: 20 },
-  sosBtn: {
-    width: 64, height: 64, borderRadius: 32, backgroundColor: C.sos,
-    justifyContent: 'center', alignItems: 'center',
-    shadowColor: C.sos, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5, shadowRadius: 12, elevation: 10,
-  },
+sosBtn: {
+  width: 64, height: 64, borderRadius: 32, backgroundColor: C.sos,
+  justifyContent: 'center', alignItems: 'center',
+  boxShadow: '0px 4px 12px rgba(255,59,48,0.5)',
+  elevation: 10,
+},
   sosBadge: {
     position: 'absolute', top: -4, right: -4,
     backgroundColor: '#fff', borderRadius: 8,
@@ -367,12 +378,12 @@ const s = StyleSheet.create({
   sosBadgeTxt: { fontSize: 9, fontWeight: '800', color: C.sos, letterSpacing: 0.5 },
 
   bottom: { position: 'absolute', bottom: 76, left: 0, right: 0, zIndex: 10 },
-  card: {
-    marginHorizontal: 12, backgroundColor: 'rgba(255,255,255,0.94)',
-    borderRadius: 20, paddingTop: 16, paddingHorizontal: 16, paddingBottom: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.12, shadowRadius: 16, elevation: 12,
-  },
+card: {
+  marginHorizontal: 12, backgroundColor: 'rgba(255,255,255,0.94)',
+  borderRadius: 20, paddingTop: 16, paddingHorizontal: 16, paddingBottom: 16,
+  boxShadow: '0px -2px 16px rgba(0,0,0,0.12)',
+  elevation: 12,
+},
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   cardTitle: { fontSize: 15, fontWeight: '700', color: C.text, letterSpacing: -0.2 },
   cardSub: { fontSize: 12, color: C.sub, marginTop: 2 },
