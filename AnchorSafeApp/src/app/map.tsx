@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { loadCachedShips, upsertShip } from '../services/shipCacheService';
+
+import {
+  fetchRestrictedZones,
+} from "../services/marineZoneService";
+
+import {
+  uploadZonesToFirestore,
+  loadZonesFromFirestore,
+} from "../services/zoneService";
+
 import { Ionicons } from "@expo/vector-icons";
 import BottomNav from "../components/ui/BottomNav";
 import { connectAISStream, disconnectAISStream } from "../services/aisService";
@@ -8,11 +18,7 @@ import {
   TextInput, ScrollView, Animated, Platform,
 } from 'react-native';
 
-import { geoJsonToZones } from '../data/geoJsonToZones';
-import data from '../data/data.json';
-
 const IS_WEB = Platform.OS === 'web';
-const ZONES = geoJsonToZones(data);
 
 const C = {
   primary: '#1A6FA8',
@@ -33,9 +39,11 @@ const zoneColor = (type: string) =>
 function LeafletMap({
   selectedZoneId,
   onZonePress,
+  zones,
 }: {
   selectedZoneId: string;
   onZonePress: (id: string) => void;
+  zones: any[];
 }) {
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
 
@@ -53,9 +61,11 @@ function LeafletMap({
     iframeRef.current.contentWindow.postMessage({ type: 'selectZone', id: selectedZoneId }, '*');
   }, [selectedZoneId]);
 
-  const zonesJson = JSON.stringify(
-    ZONES.map((z: any) => ({ id: z.id, coords: z.coords, color: z.color }))
-  );
+  // Re-send zones to iframe whenever they change (after Firestore load)
+  useEffect(() => {
+    if (!IS_WEB || !iframeRef.current?.contentWindow || zones.length === 0) return;
+    iframeRef.current.contentWindow.postMessage({ type: 'loadZones', zones: zones.map((z: any) => ({ id: z.id, coords: z.coords, color: z.color })) }, '*');
+  }, [zones]);
 
   const html = React.useMemo(() => `<!DOCTYPE html><html><head>
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -66,16 +76,19 @@ function LeafletMap({
 var map = L.map('map', { center:[45.549,13.7276], zoom:14, zoomControl:false, attributionControl:false });
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19 }).addTo(map);
 
-var zones = ${zonesJson};
 var polys = {};
-var selectedId = 'z1';
+var selectedId = '';
 var shipMarkers = {};
 
-zones.forEach(function(z) {
-  var poly = L.polygon(z.coords, { color:z.color, fillColor:z.color, fillOpacity:0.22, weight:2, opacity:0.65 }).addTo(map);
-  poly.on('click', function() { window.parent.postMessage({ type:'zonePress', id:z.id }, '*'); });
-  polys[z.id] = poly;
-});
+function loadZones(zones) {
+  Object.values(polys).forEach(function(p) { map.removeLayer(p); });
+  polys = {};
+  zones.forEach(function(z) {
+    var poly = L.polygon(z.coords, { color:z.color, fillColor:z.color, fillOpacity:0.22, weight:2, opacity:0.65 }).addTo(map);
+    poly.on('click', function() { window.parent.postMessage({ type:'zonePress', id:z.id }, '*'); });
+    polys[z.id] = poly;
+  });
+}
 
 var userIcon = L.divIcon({
   html: '<div style="width:14px;height:14px;background:#1A6FA8;border-radius:50%;border:3px solid white;box-shadow:0 0 0 3px rgba(26,111,168,0.3);"></div>',
@@ -104,6 +117,10 @@ function makePopup(s) {
 window.addEventListener('message', function(e) {
   var msg = e.data;
   if (!msg) return;
+
+  if (msg.type === 'loadZones') {
+    loadZones(msg.zones);
+  }
 
   if (msg.type === 'shipUpdate') {
     var s = msg.ship;
@@ -163,32 +180,78 @@ function Chip({ icon, value }: { icon: string; value: string }) {
 export default function MapScreen({ setActiveScreen }: any) {
   const [search, setSearch] = useState('');
   const [focused, setFocused] = useState(false);
-  const [selectedId, setSelectedId] = useState(ZONES[0]?.id ?? 'z1');
+  const [zones, setZones] = useState<any[]>([]);
+  const [selectedId, setSelectedId] = useState('');
   const [expanded, setExpanded] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const cardAnim = React.useRef(new Animated.Value(0)).current;
   const sosAnim = React.useRef(new Animated.Value(1)).current;
 
-  const zone = ZONES.find((z: any) => z.id === selectedId) ?? ZONES[0];
-  const zc = zoneColor(zone.type);
+  const zone = zones.find((z: any) => z.id === selectedId) ?? zones[0];
+  const zc = zone ? zoneColor(zone.type) : C.primary;
 
-useEffect(() => {
-  const iframe = document.querySelector('iframe') as HTMLIFrameElement;
+  // Load zones from Firestore only
+// Load zones — прво од Firestore, API само ако е празно
+  useEffect(() => {
+    async function loadZones() {
+      try {
+        setLoading(true);
 
-  loadCachedShips().then((cached) => {
-    cached.forEach((ship) => {
-      iframe?.contentWindow?.postMessage({ type: 'shipUpdate', ship }, '*');
+        // Чекај прво Firestore (брзо)
+        const cached = await loadZonesFromFirestore();
+
+        if (cached.length > 0) {
+          // Имаме кеш — прикажи веднаш
+          // НЕ правиме background refresh — тоа повикуваше fetchRestrictedZones()
+          // кое праќаше 100+ барања до open-meteo одеднаш → 429
+          setZones(cached);
+          setSelectedId(cached[0].id);
+          setLoading(false);
+        } else {
+          // Прв пат — нема кеш, мора да земе од API
+          const apiZones = await fetchRestrictedZones();
+          await uploadZonesToFirestore(apiZones);
+          const firestoreZones = await loadZonesFromFirestore();
+          setZones(firestoreZones);
+          if (firestoreZones.length > 0) {
+            setSelectedId(firestoreZones[0].id);
+          }
+          setLoading(false);
+        }
+      } catch (error) {
+        console.log("Zones Error:", error);
+        setLoading(false);
+      }
+    }
+
+    loadZones();
+  }, []);
+
+  // AIS ship stream
+  useEffect(() => {
+    // Cached ships работи на сите платформи
+    loadCachedShips().then((cached) => {
+      if (IS_WEB) {
+        const iframe = document.querySelector('iframe') as HTMLIFrameElement;
+        cached.forEach((ship) => {
+          iframe?.contentWindow?.postMessage({ type: 'shipUpdate', ship }, '*');
+        });
+      }
     });
-  });
+ 
+    // AIS WebSocket не работи од браузер (CORS/firewall блокада)
+    // Само на React Native (мобилен)
+    if (IS_WEB) return;
+ 
+    connectAISStream((ship) => {
+      upsertShip(ship);
+    });
+ 
+    return () => disconnectAISStream();
+  }, []); 
 
-  connectAISStream((ship) => {
-    iframe?.contentWindow?.postMessage({ type: 'shipUpdate', ship }, '*');
-    upsertShip(ship);
-  });
-
-  return () => disconnectAISStream();
-}, []);
-
+  // SOS pulse animation
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
@@ -198,14 +261,14 @@ useEffect(() => {
     ).start();
   }, []);
 
+  // Card expand animation
   useEffect(() => {
-// Card animation — смени:
-Animated.spring(cardAnim, {
-  toValue: expanded ? 1 : 0,
-  useNativeDriver: false, // ← веќе е false, ОК
-  tension: 55,
-  friction: 10,
-}).start();
+    Animated.spring(cardAnim, {
+      toValue: expanded ? 1 : 0,
+      useNativeDriver: false,
+      tension: 55,
+      friction: 10,
+    }).start();
   }, [expanded]);
 
   const cardH = cardAnim.interpolate({ inputRange: [0, 1], outputRange: [96, 228] });
@@ -217,7 +280,7 @@ Animated.spring(cardAnim, {
 
   return (
     <View style={s.root}>
-      <LeafletMap selectedZoneId={selectedId} onZonePress={selectZone} />
+      <LeafletMap selectedZoneId={selectedId} onZonePress={selectZone} zones={zones} />
 
       <View style={s.header}>
         <View style={s.headerRow}>
@@ -256,81 +319,87 @@ Animated.spring(cardAnim, {
         </TouchableOpacity>
       </Animated.View>
 
-      <View style={s.bottom}>
-        <TouchableOpacity activeOpacity={0.97} onPress={() => setExpanded(v => !v)}>
-          <Animated.View style={[s.card, { minHeight: cardH }]}>
-            <View style={s.cardRow}>
-              <ZoneIcon type={zone.type} />
-              <View style={{ flex: 1 }}>
-                <Text style={s.cardTitle}>
-                  {zone.type === 'safe' ? 'Safe Zone' : zone.type === 'danger' ? 'Danger Zone' : 'Caution Zone'}: {zone.name}
-                </Text>
-                <Text style={s.cardSub}>{zone.subtitle}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', gap: 6 }}>
-                <Chip icon="🌡" value={zone.temp} />
-                <Chip icon="💨" value={zone.wind} />
-              </View>
-            </View>
-
-            {expanded && (
-              <View style={{ marginTop: 12 }}>
-                <View style={[s.divider, { backgroundColor: zc + '44' }]} />
-                <View style={s.stats}>
-                  {[
-                    { label: 'Status', val: zone.type.toUpperCase(), badge: true },
-                    { label: 'Temp', val: zone.temp + 'C' },
-                    { label: 'Wind', val: zone.wind },
-                    { label: 'Bed', val: zone.subtitle.split(' • ')[0] },
-                  ].map((st, i) => (
-                    <View key={i} style={s.statItem}>
-                      <Text style={s.statLabel}>{st.label}</Text>
-                      {st.badge ? (
-                        <View style={[s.statBadge, { backgroundColor: zc + '22' }]}>
-                          <Text style={[s.statBadgeTxt, { color: zc }]}>{st.val}</Text>
-                        </View>
-                      ) : (
-                        <Text style={s.statVal}>{st.val}</Text>
-                      )}
-                    </View>
-                  ))}
+      {loading ? (
+        <View style={s.loadingWrap}>
+          <Text style={s.loadingTxt}>Loading zones…</Text>
+        </View>
+      ) : zone ? (
+        <View style={s.bottom}>
+          <TouchableOpacity activeOpacity={0.97} onPress={() => setExpanded(v => !v)}>
+            <Animated.View style={[s.card, { minHeight: cardH }]}>
+              <View style={s.cardRow}>
+                <ZoneIcon type={zone.type} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.cardTitle}>
+                    {zone.type === 'safe' ? 'Safe Zone' : zone.type === 'danger' ? 'Danger Zone' : 'Caution Zone'}: {zone.name}
+                  </Text>
+                  <Text style={s.cardSub}>{zone.subtitle}</Text>
                 </View>
-                <View style={s.actions}>
-                  <TouchableOpacity style={[s.actionBtn, { backgroundColor: zc }]}>
-                    <Text style={s.actionBtnTxt}>Set Anchor Here</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[s.actionOutline, { borderColor: C.primary }]}>
-                    <Text style={[s.actionOutlineTxt, { color: C.primary }]}>View Details</Text>
-                  </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <Chip icon="🌡" value={zone.temp} />
+                  <Chip icon="💨" value={zone.wind} />
                 </View>
               </View>
-            )}
-            <View style={s.pill} />
-          </Animated.View>
-        </TouchableOpacity>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ marginTop: 8 }}
-          contentContainerStyle={{ paddingHorizontal: 14, gap: 8 }}
-        >
-          {ZONES.map((z: any) => {
-            const active = z.id === selectedId;
-            const col = zoneColor(z.type);
-            return (
-              <TouchableOpacity
-                key={z.id}
-                style={[s.zonePill, active && { backgroundColor: col, borderColor: col }]}
-                onPress={() => selectZone(z.id)}
-              >
-                <View style={[s.zoneDot, { backgroundColor: active ? '#fff' : col }]} />
-                <Text style={[s.zonePillTxt, { color: active ? '#fff' : C.text }]}>{z.name}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
+              {expanded && (
+                <View style={{ marginTop: 12 }}>
+                  <View style={[s.divider, { backgroundColor: zc + '44' }]} />
+                  <View style={s.stats}>
+                    {[
+                      { label: 'Status', val: zone.type.toUpperCase(), badge: true },
+                      { label: 'Temp', val: zone.temp + 'C' },
+                      { label: 'Wind', val: zone.wind },
+                      { label: 'Bed', val: zone.subtitle.split(' • ')[0] },
+                    ].map((st, i) => (
+                      <View key={i} style={s.statItem}>
+                        <Text style={s.statLabel}>{st.label}</Text>
+                        {st.badge ? (
+                          <View style={[s.statBadge, { backgroundColor: zc + '22' }]}>
+                            <Text style={[s.statBadgeTxt, { color: zc }]}>{st.val}</Text>
+                          </View>
+                        ) : (
+                          <Text style={s.statVal}>{st.val}</Text>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                  <View style={s.actions}>
+                    <TouchableOpacity style={[s.actionBtn, { backgroundColor: zc }]}>
+                      <Text style={s.actionBtnTxt}>Set Anchor Here</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.actionOutline, { borderColor: C.primary }]}>
+                      <Text style={[s.actionOutlineTxt, { color: C.primary }]}>View Details</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+              <View style={s.pill} />
+            </Animated.View>
+          </TouchableOpacity>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginTop: 8 }}
+            contentContainerStyle={{ paddingHorizontal: 14, gap: 8 }}
+          >
+            {zones.map((z: any) => {
+              const active = z.id === selectedId;
+              const col = zoneColor(z.type);
+              return (
+                <TouchableOpacity
+                  key={z.id}
+                  style={[s.zonePill, active && { backgroundColor: col, borderColor: col }]}
+                  onPress={() => selectZone(z.id)}
+                >
+                  <View style={[s.zoneDot, { backgroundColor: active ? '#fff' : col }]} />
+                  <Text style={[s.zonePillTxt, { color: active ? '#fff' : C.text }]}>{z.name}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ) : null}
 
       <BottomNav activeTab="map" setActiveScreen={setActiveScreen} />
     </View>
@@ -363,12 +432,12 @@ const s = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 15, color: C.text },
 
   sosWrap: { position: 'absolute', right: 16, bottom: 220, zIndex: 20 },
-sosBtn: {
-  width: 64, height: 64, borderRadius: 32, backgroundColor: C.sos,
-  justifyContent: 'center', alignItems: 'center',
-  boxShadow: '0px 4px 12px rgba(255,59,48,0.5)',
-  elevation: 10,
-},
+  sosBtn: {
+    width: 64, height: 64, borderRadius: 32, backgroundColor: C.sos,
+    justifyContent: 'center', alignItems: 'center',
+    boxShadow: '0px 4px 12px rgba(255,59,48,0.5)',
+    elevation: 10,
+  },
   sosBadge: {
     position: 'absolute', top: -4, right: -4,
     backgroundColor: '#fff', borderRadius: 8,
@@ -377,13 +446,23 @@ sosBtn: {
   },
   sosBadgeTxt: { fontSize: 9, fontWeight: '800', color: C.sos, letterSpacing: 0.5 },
 
+  loadingWrap: {
+    position: 'absolute', bottom: 120, left: 0, right: 0,
+    alignItems: 'center', zIndex: 10,
+  },
+  loadingTxt: {
+    color: '#fff', fontSize: 14, fontWeight: '600',
+    backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 16,
+    paddingVertical: 8, borderRadius: 20,
+  },
+
   bottom: { position: 'absolute', bottom: 76, left: 0, right: 0, zIndex: 10 },
-card: {
-  marginHorizontal: 12, backgroundColor: 'rgba(255,255,255,0.94)',
-  borderRadius: 20, paddingTop: 16, paddingHorizontal: 16, paddingBottom: 16,
-  boxShadow: '0px -2px 16px rgba(0,0,0,0.12)',
-  elevation: 12,
-},
+  card: {
+    marginHorizontal: 12, backgroundColor: 'rgba(255,255,255,0.94)',
+    borderRadius: 20, paddingTop: 16, paddingHorizontal: 16, paddingBottom: 16,
+    boxShadow: '0px -2px 16px rgba(0,0,0,0.12)',
+    elevation: 12,
+  },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   cardTitle: { fontSize: 15, fontWeight: '700', color: C.text, letterSpacing: -0.2 },
   cardSub: { fontSize: 12, color: C.sub, marginTop: 2 },
