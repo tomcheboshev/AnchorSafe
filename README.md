@@ -28,56 +28,12 @@ Currently, there is no simple and accessible platform that helps users safely na
 **AnchorSafe** provides a smart mobile solution that helps sailors:
 - Find safe anchoring zones
 - Avoid protected or dangerous marine areas
-- Receive real-time GPS navigation assistance
 - Get warnings when entering restricted zones
-- Learn about marine ecosystem protection
 
 The application also includes:
 - Interactive marine maps
 - Real-time alerts and notifications
-- Environmental awareness information
-- Community reporting system
 - Port and marina information
-
----
-
-# Core Features
-
-## Safe & Unsafe Zone Detection
-The application displays:
-- Safe anchoring zones
-- Protected marine areas
-- Dangerous underwater regions
-- Ports and marina locations
-
-Users receive **real-time warnings** when entering unsafe or restricted areas.
-
----
-
-## Real-Time GPS Navigation
-AnchorSafe uses live GPS tracking to:
-- Monitor the user’s location
-- Detect nearby protected zones
-- Provide navigation assistance
-- Calculate the nearest safe anchoring location
-
----
-
-## Environmental Awareness System
-The application educates users about:
-- Marine ecosystem protection
-- Environmental impact of unsafe anchoring
-- Sustainable sailing practices
-- Protected underwater habitats
-
----
-
-## Community Reporting System
-Users can report:
-- Illegal anchoring
-- Marine pollution
-- Dangerous underwater obstacles
-- Damaged marine areas
 
 ---
 
@@ -149,7 +105,7 @@ The main research areas for the project include:
 - Marine maps and GPS systems
 - Geofencing and zone detection
 - Protected marine datasets
-- Real-time notifications
+- Real-time notifications and news
 - Offline navigation support
 - Weather and sea condition APIs
 
@@ -214,8 +170,10 @@ Add your Firebase configuration inside the project configuration file.
 
 # Future Improvements
 
-Possible future improvements include:
-- AI-based route optimization
+Possible future improvements include:ž
+- Educating users about marine ecosystems
+- Navigation to nearest safe zone
+- Reporting unsafe or illegal activity
 - Weather and sea condition monitoring
 - Offline marine maps
 - Coast guard integration
