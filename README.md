@@ -174,6 +174,7 @@ Add your Firebase configuration inside the project configuration file.
 Possible future improvements include:ž
 - Educating users about marine ecosystems
 - Navigation to nearest safe zone
+- Reserving safe spots and seeing availability
 - Reporting unsafe or illegal activity
 - Weather and sea condition monitoring
 - Offline marine maps
