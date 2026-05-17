@@ -304,7 +304,7 @@ useEffect(() => {
   // AUTO REFRESH EVERY 5 SECONDS
   const interval = setInterval(() => {
     initialize();
-  }, 30000);
+  }, 60000);
 
   // CLEANUP
   return () => clearInterval(interval);

@@ -1,5 +1,5 @@
 const API_KEY =
-  "f80a4c6c-5173-11f1-bdb4-0242ac120004-f80a4d2a-5173-11f1-bdb4-0242ac120004";
+  "48df716e-51b8-11f1-81a8-0242ac120004-48df7358-51b8-11f1-81a8-0242ac120004";
 
 export async function getMarineData() {
   try {
