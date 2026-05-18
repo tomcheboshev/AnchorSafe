@@ -15,7 +15,7 @@ const RECONNECT_DELAYS = [3000, 5000, 10000, 20000, 30000]; // exponential-ish b
 let socket: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempts = 0;
-let destroyed = false; // флаг — не reconnectuvaj ako e namerno zatvoreno
+let destroyed = false; 
 
 function scheduleReconnect(onShipUpdate: (ship: Ship) => void) {
   if (destroyed) return;

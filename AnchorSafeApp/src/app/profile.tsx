@@ -1,271 +1,473 @@
-    import React, { useState } from 'react';
-    import { Ionicons } from "@expo/vector-icons";
-    import BottomNav from "../components/ui/BottomNav";
-    import {
-    View,
-    Text,
-    ScrollView,
-    TouchableOpacity,
-    Switch,
-    Image,
-    StyleSheet,
-    StatusBar,
-    SafeAreaView,
-    Platform,
-    Linking,
-    } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import BottomNav from "../components/ui/BottomNav";
 
-    // ─── Colour tokens (matching original design) ────────────────────────────────
-    const C = {
-    primary:             '#005ab3',
-    secondary:           '#476083',
-    background:          '#F4F9FC',
-    surface:             '#f9f9ff',
-    surfaceLowest:       '#ffffff',
-    surfaceVariant:      '#e0e2ed',
-    surfaceContainerHigh:'#e5e8f2',
-    outline:             '#717786',
-    outlineVariant:      '#c0c6d6',
-    onSurface:           '#181c23',
-    onSurfaceVariant:    '#414754',
-    dangerRed:           '#FF3B30',
-    safeGreen:           '#2ECC71',
-    warningYellow:       '#F4D03F',
-    primaryFixed:        '#d6e3ff',
-    primaryFixedDim:     '#aac7ff',
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Switch,
+  Image,
+  StyleSheet,
+  StatusBar,
+  SafeAreaView,
+  Platform,
+  Linking,
+  Animated,
+} from 'react-native';
+
+// ─── Colour tokens ─────────────────────────────────────────────────────────────
+const C = {
+  primary: '#005ab3',
+  secondary: '#476083',
+  background: '#F4F9FC',
+  surface: '#f9f9ff',
+  surfaceLowest: '#ffffff',
+  surfaceVariant: '#e0e2ed',
+  surfaceContainerHigh: '#e5e8f2',
+  outline: '#717786',
+  outlineVariant: '#c0c6d6',
+  onSurface: '#181c23',
+  onSurfaceVariant: '#414754',
+  dangerRed: '#FF3B30',
+  safeGreen: '#2ECC71',
+  warningYellow: '#F4D03F',
+  primaryFixed: '#d6e3ff',
+  primaryFixedDim: '#aac7ff',
+};
+
+// ─── Reusable Components ──────────────────────────────────────────────────────
+
+const SectionHeader = ({ title }: any) => (
+  <Text style={styles.sectionHeader}>
+    {title.toUpperCase()}
+  </Text>
+);
+
+const Card = ({ children }: any) => (
+  <View style={styles.card}>
+    {children}
+  </View>
+);
+
+const ToggleRow = ({
+  label,
+  value,
+  onChange,
+  isLast,
+}: any) => (
+  <View style={[styles.row, !isLast && styles.rowBorder]}>
+    <View style={styles.rowLeft}>
+      <Text style={styles.rowLabel}>{label}</Text>
+    </View>
+
+    <Switch
+      value={value}
+      onValueChange={onChange}
+      trackColor={{
+        false: C.surfaceVariant,
+        true: C.primary,
+      }}
+      thumbColor={
+        Platform.OS === "android"
+          ? value
+            ? C.primaryFixedDim
+            : "#f4f3f4"
+          : undefined
+      }
+      ios_backgroundColor={C.surfaceVariant}
+    />
+  </View>
+);
+
+const ArrowRow = ({
+  label,
+  value,
+  iconColor,
+  isLast,
+  onPress,
+  externalLink,
+}: any) => (
+  <TouchableOpacity
+    style={[styles.row, !isLast && styles.rowBorder]}
+    onPress={onPress}
+    activeOpacity={0.65}
+  >
+    <View style={styles.rowLeft}>
+      <Text
+        style={[
+          styles.rowLabel,
+          iconColor && { color: iconColor },
+        ]}
+      >
+        {label}
+      </Text>
+    </View>
+
+    <View style={styles.rowRight}>
+      {value ? (
+        <Text style={styles.rowValue}>
+          {value}
+        </Text>
+      ) : null}
+
+      <Ionicons
+        name={
+          externalLink
+            ? "open-outline"
+            : "chevron-forward"
+        }
+        size={18}
+        color={C.outline}
+      />
+    </View>
+  </TouchableOpacity>
+);
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+
+export default function SettingsScreen({
+  setActiveScreen,
+}: any) {
+
+  // ─── State ─────────────────────────────────────────────────────────
+
+  const [showDepth, setShowDepth] = useState(true);
+  const [autoReroute, setAutoReroute] = useState(false);
+
+  const [proximity, setProximity] = useState(true);
+  const [weather, setWeather] = useState(true);
+  const [envNotices, setEnvNotices] = useState(false);
+
+  // ─── Entry Animations ──────────────────────────────────────────────
+
+  const fadeHeader = useRef(new Animated.Value(0)).current;
+  const fadeProfile = useRef(new Animated.Value(0)).current;
+  const fadeNav = useRef(new Animated.Value(0)).current;
+  const fadeNotifications = useRef(new Animated.Value(0)).current;
+  const fadeSafety = useRef(new Animated.Value(0)).current;
+  const fadeSupport = useRef(new Animated.Value(0)).current;
+  const fadeVersion = useRef(new Animated.Value(0)).current;
+
+  const slideProfile = useRef(new Animated.Value(18)).current;
+  const slideNav = useRef(new Animated.Value(18)).current;
+  const slideNotifications = useRef(new Animated.Value(18)).current;
+  const slideSafety = useRef(new Animated.Value(18)).current;
+  const slideSupport = useRef(new Animated.Value(18)).current;
+  const slideVersion = useRef(new Animated.Value(18)).current;
+
+  useEffect(() => {
+
+    const stagger = (
+      fade: Animated.Value,
+      delay: number,
+      slide?: Animated.Value
+    ) => {
+
+      const animations: Animated.CompositeAnimation[] = [
+        Animated.timing(fade, {
+          toValue: 1,
+          duration: 420,
+          delay,
+          useNativeDriver: true,
+        }),
+      ];
+
+      if (slide) {
+        animations.push(
+          Animated.timing(slide, {
+            toValue: 0,
+            duration: 420,
+            delay,
+            useNativeDriver: true,
+          })
+        );
+      }
+
+      return Animated.parallel(animations);
     };
 
-    // ─── Reusable: Section Header ─────────────────────────────────────────────────
-    const SectionHeader = ({ title }: any) => (
-    <Text style={styles.sectionHeader}>
-        {title.toUpperCase()}
-    </Text>
-    );
+    Animated.stagger(90, [
+      stagger(fadeHeader, 0),
+      stagger(fadeProfile, 0, slideProfile),
+      stagger(fadeNav, 0, slideNav),
+      stagger(fadeNotifications, 0, slideNotifications),
+      stagger(fadeSafety, 0, slideSafety),
+      stagger(fadeSupport, 0, slideSupport),
+      stagger(fadeVersion, 0, slideVersion),
+    ]).start();
 
-    const Card = ({ children }: any) => (
-    <View style={styles.card}>
-        {children}
-    </View>
-    );
+  }, []);
 
-    const ToggleRow = ({
-    icon,
-    label,
-    value,
-    onChange,
-    isLast,
-    }: any) => (
-    <View style={[styles.row, !isLast && styles.rowBorder]}>
-        <View style={styles.rowLeft}>
-        <Text style={styles.rowLabel}>{label}</Text>
+  return (
+    <SafeAreaView style={styles.safe}>
+
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={C.surface}
+      />
+
+      {/* ── Top Bar ── */}
+
+      <Animated.View
+        style={[
+          styles.topBar,
+          {
+            opacity: fadeHeader,
+          },
+        ]}
+      >
+        <View style={styles.topBarLeft}>
+          <Text style={styles.screenTitle}>
+            Profile Settings
+          </Text>
         </View>
 
-        <Switch
-        value={value}
-        onValueChange={onChange}
-        trackColor={{
-            false: C.surfaceVariant,
-            true: C.primary,
-        }}
-        thumbColor={
-            Platform.OS === "android"
-            ? value
-                ? C.primaryFixedDim
-                : "#f4f3f4"
-            : undefined
-        }
-        ios_backgroundColor={C.surfaceVariant}
-        />
-    </View>
-    );
-
-    const ArrowRow = ({
-    icon,
-    label,
-    value,
-    iconColor,
-    isLast,
-    onPress,
-    externalLink,
-    }: any) => (
-    <TouchableOpacity
-        style={[styles.row, !isLast && styles.rowBorder]}
-        onPress={onPress}
-        activeOpacity={0.65}
-    >
-        <View style={styles.rowLeft}>
-        {icon ? (
-            <Text
-            style={[
-                styles.icon,
-                iconColor && { color: iconColor },
-            ]}
-            >
-            {icon}
-            </Text>
-        ) : null}
-
-        <Text style={styles.rowLabel}>
-            {label}
-        </Text>
-        </View>
-
-        <View style={styles.rowRight}>
-        {value ? (
-            <Text style={styles.rowValue}>
-            {value}
-            </Text>
-        ) : null}
-
-        <Ionicons
-            name={
-                externalLink
-                ? "open-outline"
-                : "chevron-forward"
-            }
-            size={18}
-            color={C.outline}
-            />
-                    </View>
-    </TouchableOpacity>
-    );
-
-    // ─── Main Screen ──────────────────────────────────────────────────────────────
-    export default function SettingsScreen({
-    setActiveScreen,
-    }: any) {
-    // Navigation prefs
-    const [showDepth,    setShowDepth]    = useState(true);
-    const [autoReroute,  setAutoReroute]  = useState(false);
-
-    // Notifications
-    const [proximity,    setProximity]    = useState(true);
-    const [weather,      setWeather]      = useState(true);
-    const [envNotices,   setEnvNotices]   = useState(false);
-
-
-    return (
-        <SafeAreaView style={styles.safe}>
-        <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
-
-        {/* ── Top App Bar ── */}
-        <View style={styles.topBar}>
-            <View style={styles.topBarLeft}>
-            <Text style={styles.screenTitle}>Profile Settings</Text>
-            </View>
-            <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7}>
-            <Ionicons
-  name="search"
-  size={22}
-  color={C.primary}
-/>
-            </TouchableOpacity>
-        </View>
-
-        {/* ── Scrollable Content ── */}
-        <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.content}
-            showsVerticalScrollIndicator={false}
+        <TouchableOpacity
+          style={styles.iconBtn}
+          activeOpacity={0.7}
         >
-            {/* Profile Card */}
-            <View style={styles.profileCard}>
+          <Ionicons
+            name="search"
+            size={22}
+            color={C.primary}
+          />
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* ── Content ── */}
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+
+        {/* Profile Card */}
+
+        <Animated.View
+          style={{
+            opacity: fadeProfile,
+            transform: [
+              { translateY: slideProfile }
+            ],
+          }}
+        >
+          <View style={styles.profileCard}>
+
             <Image
-                source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAwJ-c0GknTB0YWIltKhbh6_4XurelAigH7fEbMYsleyX01xo2h3jyoGjZtWpQ1DjZCXtQJqvEnaAVNvZoQJ9cdLLWnHaYIFkUa5jmggTbuuPkLC_cPgLtpj3mscXWhPQgyF2_OS1q6MX_8YDqTCcEh1SsAbyIT-FDUQp-NSq7fO0TPHFhpSbSG9z0mvohvL9bF5lSam4Zu_sBouLqIAI1DgGrVFQph5UE-Q-AQTsvP88AtZIAETVtiIn8Uxal-zafR8ZMWs781RfE' }}
-                style={styles.avatar}
+              source={{
+                uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAwJ-c0GknTB0YWIltKhbh6_4XurelAigH7fEbMYsleyX01xo2h3jyoGjZtWpQ1DjZCXtQJqvEnaAVNvZoQJ9cdLLWnHaYIFkUa5jmggTbuuPkLC_cPgLtpj3mscXWhPQgyF2_OS1q6MX_8YDqTCcEh1SsAbyIT-FDUQp-NSq7fO0TPHFhpSbSG9z0mvohvL9bF5lSam4Zu_sBouLqIAI1DgGrVFQph5UE-Q-AQTsvP88AtZIAETVtiIn8Uxal-zafR8ZMWs781RfE'
+              }}
+              style={styles.avatar}
             />
+
             <View>
-                <Text style={styles.profileName}>Captain Name Surname</Text>
-                <Text style={styles.profileSub}>Ocean Voyager Pro Member</Text>
+              <Text style={styles.profileName}>
+                Captain Name Surname
+              </Text>
+
+              <Text style={styles.profileSub}>
+                Ocean Voyager Pro Member
+              </Text>
             </View>
-            </View>
 
-            {/* ── Navigation Preferences ── */}
-            <SectionHeader title="Navigation Preferences" />
-            <Card>
+          </View>
+        </Animated.View>
+
+        {/* Navigation Preferences */}
+
+        <Animated.View
+          style={{
+            opacity: fadeNav,
+            transform: [
+              { translateY: slideNav }
+            ],
+          }}
+        >
+
+          <SectionHeader title="Navigation Preferences" />
+
+          <Card>
+
             <ToggleRow
-                label="Show Depth Contours"
-                value={showDepth}
-                onChange={setShowDepth}
+              label="Show Depth Contours"
+              value={showDepth}
+              onChange={setShowDepth}
             />
+
             <ToggleRow
-                label="Automatic Rerouting"
-                value={autoReroute}
-                onChange={setAutoReroute}
+              label="Automatic Rerouting"
+              value={autoReroute}
+              onChange={setAutoReroute}
             />
+
             <ArrowRow
-                label="Units of Measure"
-                value="Nautical Miles"
-                isLast
+              label="Units of Measure"
+              value="Nautical Miles"
+              isLast
             />
-            </Card>
 
-            {/* ── Notifications ── */}
-            <SectionHeader title="Notifications" />
-            <Card>
-            <ToggleRow
-                label="Proximity Alerts"
-                value={proximity}
-                onChange={setProximity}
-            />
-            <ToggleRow
-                label="Weather Warnings"
-                value={weather}
-                onChange={setWeather}
-            />
-            <ToggleRow
-                label="Environmental Notices"
-                value={envNotices}
-                onChange={setEnvNotices}
-                isLast
-            />
-            </Card>
+          </Card>
 
-            {/* ── Safety ── */}
-            <SectionHeader title="Safety" />
-            <Card>
+        </Animated.View>
+
+        {/* Notifications */}
+
+        <Animated.View
+          style={{
+            opacity: fadeNotifications,
+            transform: [
+              { translateY: slideNotifications }
+            ],
+          }}
+        >
+
+          <SectionHeader title="Notifications" />
+
+          <Card>
+
+            <ToggleRow
+              label="Proximity Alerts"
+              value={proximity}
+              onChange={setProximity}
+            />
+
+            <ToggleRow
+              label="Weather Warnings"
+              value={weather}
+              onChange={setWeather}
+            />
+
+            <ToggleRow
+              label="Environmental Notices"
+              value={envNotices}
+              onChange={setEnvNotices}
+              isLast
+            />
+
+          </Card>
+
+        </Animated.View>
+
+        {/* Safety */}
+
+        <Animated.View
+          style={{
+            opacity: fadeSafety,
+            transform: [
+              { translateY: slideSafety }
+            ],
+          }}
+        >
+
+          <SectionHeader title="Safety" />
+
+          <Card>
+
             <ArrowRow
-                label="Manage Emergency Contacts"
-                 onPress={() => setActiveScreen("emergencyContacts")}
+              label="Manage Emergency Contacts"
+              onPress={() =>
+                setActiveScreen("emergencyContacts")
+              }
             />
+
             <ArrowRow
-                label="Vessel Finder"
-                externalLink
-                    onPress={() => Linking.openURL("https://www.vesselfinder.com/")}
-            />
-            </Card>
-
-            {/* ── About & Support ── */}
-            <SectionHeader title="About & Support" />
-            <Card>
-            <ArrowRow label="Privacy Policy"  externalLink 
-            onPress={()=>Linking.openURL("https://www.anchorsafe.com/privacy-policy")} />
-            <ArrowRow label="Terms of Service" externalLink
-            onPress={()=>Linking.openURL("https://www.anchorsafe.com/terms-of-service")} />
-            <ArrowRow label="Support"
-            onPress={() => setActiveScreen("support")}/>
-            </Card>
-
-            {/* Version info */}
-            <View style={styles.versionBlock}>
-            <Text style={styles.versionApp}>AnchorSafe App</Text>
-            <Text style={styles.versionNum}>v1.2.4</Text>
-            </View>
-        </ScrollView>
-
-        {/* ── Bottom Navigation Bar ── */}
-
-            <BottomNav
-            activeTab="profile"
-            setActiveScreen={setActiveScreen}
+              label="Vessel Finder"
+              externalLink
+              onPress={() =>
+                Linking.openURL(
+                  "https://www.vesselfinder.com/"
+                )
+              }
             />
 
-        </SafeAreaView>
-    );
-    }
+          </Card>
 
-    // ─── Styles ───────────────────────────────────────────────────────────────────
-    const styles = StyleSheet.create({
+        </Animated.View>
+
+        {/* About & Support */}
+
+        <Animated.View
+          style={{
+            opacity: fadeSupport,
+            transform: [
+              { translateY: slideSupport }
+            ],
+          }}
+        >
+
+          <SectionHeader title="About & Support" />
+
+          <Card>
+
+            <ArrowRow
+              label="Privacy Policy"
+              externalLink
+              onPress={() =>
+                Linking.openURL(
+                  "https://www.anchorsafe.com/privacy-policy"
+                )
+              }
+            />
+
+            <ArrowRow
+              label="Terms of Service"
+              externalLink
+              onPress={() =>
+                Linking.openURL(
+                  "https://www.anchorsafe.com/terms-of-service"
+                )
+              }
+            />
+
+            <ArrowRow
+              label="Support"
+              onPress={() =>
+                setActiveScreen("support")
+              }
+            />
+
+          </Card>
+
+        </Animated.View>
+
+        {/* Version */}
+
+        <Animated.View
+          style={[
+            styles.versionBlock,
+            {
+              opacity: fadeVersion,
+              transform: [
+                { translateY: slideVersion }
+              ],
+            },
+          ]}
+        >
+          <Text style={styles.versionApp}>
+            AnchorSafe App
+          </Text>
+
+          <Text style={styles.versionNum}>
+            v1.2.4
+          </Text>
+        </Animated.View>
+
+      </ScrollView>
+
+      {/* Bottom Nav */}
+
+      <BottomNav
+        activeTab="profile"
+        setActiveScreen={setActiveScreen}
+      />
+
+    </SafeAreaView>
+  );
+}
+const styles = StyleSheet.create({
     safe: {
         flex: 1,
         backgroundColor: C.background,
